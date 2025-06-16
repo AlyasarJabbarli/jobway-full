@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { JobForm } from "@/components/forms/job-form"
 import type { JobFormData } from "@/lib/form-types"
-import { enhancedJobs } from "@/lib/enhanced-jobs-data"
+import { allJobs } from "@/lib/enhanced-jobs-data"
 
 export default function EditJobPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -14,7 +14,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const foundJob = enhancedJobs.find((j) => j.id === params.id)
+    const foundJob = allJobs.find((j) => j.id === params.id)
     if (foundJob) {
       setJob(foundJob)
     }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { enhancedJobsData } from "@/lib/enhanced-jobs-data"
+import { allJobs } from "@/lib/enhanced-jobs-data"
 import { Search, Plus, Eye, Edit, Flag, Briefcase, MapPin, DollarSign, Calendar, Building2 } from "lucide-react"
 import Link from "next/link"
 
@@ -17,7 +17,7 @@ export default function ModerationJobsPage() {
   const [locationFilter, setLocationFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
 
-  const filteredJobs = enhancedJobsData.filter((job) => {
+  const filteredJobs = allJobs.filter((job) => {
     const matchesSearch =
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,7 +72,7 @@ export default function ModerationJobsPage() {
               <Briefcase className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{enhancedJobsData.length}</div>
+              <div className="text-2xl font-bold">{allJobs.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -82,7 +82,7 @@ export default function ModerationJobsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {enhancedJobsData.filter((job) => job.status === "active").length}
+                {allJobs.filter((job) => job.status === "active").length}
               </div>
             </CardContent>
           </Card>
@@ -93,7 +93,7 @@ export default function ModerationJobsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {enhancedJobsData.filter((job) => job.status === "pending").length}
+                {allJobs.filter((job) => job.status === "pending").length}
               </div>
             </CardContent>
           </Card>
@@ -104,7 +104,7 @@ export default function ModerationJobsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {enhancedJobsData.filter((job) => job.status === "expired").length}
+                {allJobs.filter((job) => job.status === "expired").length}
               </div>
             </CardContent>
           </Card>

@@ -4,7 +4,7 @@ import { ModerationLayout } from "@/components/moderation/moderation-layout"
 import { JobForm } from "@/components/forms/job-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { enhancedJobsData } from "@/lib/enhanced-jobs-data"
+import { allJobs } from "@/lib/enhanced-jobs-data"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -16,7 +16,7 @@ interface EditModerationJobPageProps {
 }
 
 export default function EditModerationJobPage({ params }: EditModerationJobPageProps) {
-  const job = enhancedJobsData.find((j) => j.id === params.id)
+  const job = allJobs.find((j) => j.id === params.id)
 
   if (!job) {
     notFound()
