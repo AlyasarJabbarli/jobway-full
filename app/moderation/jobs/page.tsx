@@ -193,7 +193,7 @@ export default function ModerationJobsPage() {
                       </div>
                       <div className="flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        <span>{formatSalary(job.salaryMin, job.salaryMax)}</span>
+                        <span>{formatSalary(job.salary.min, job.salary.max)}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
