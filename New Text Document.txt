@@ -1,3 +1,0 @@
-Deploy to a VPS and point your domain to it. That is the perfect option for Deploying NextJS app with Prisma and MYSQL
-
-
