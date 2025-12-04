@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// Define models
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  jobs         Job[]    @relation("CreatedJobs")
+  companies    Company[]
+  isActive     Boolean  @default(true)
+  lastLogin    DateTime?
+}
+
+enum Role {
+  admin
+  moderator
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  logoUrl     String?
+  location    String?
+  description String?
+  website     String?
+  email       String?
+  phone       String?
+  jobs        Job[]
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  location    String
+  category    String
+  type        String
+  experience  String
+  salary_min  Int
+  salary_max  Int
+  is_premium  Boolean  @default(false)
+  company     Company  @relation(fields: [companyId], references: [id])
+  companyId   String
+  created_by  User     @relation("CreatedJobs", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  applicationEmail String?
+  applicationUrl String?
+  expiryDate DateTime?
+  responsibilities Json?     @default("[]")
+  requirements     Json?     @default("[]")
+  benefits        Json?     @default("[]")
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  imageUrl    String
+  link        String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  type      String   // e.g., "job_created", "company_added"
+  itemId    String   // ID of the job/company/etc.
+  itemType  String   // "job" or "company"
+  itemName  String
+  action    String   // e.g., "created", "updated"
+  userId    String
+  userName  String
+  createdAt DateTime @default(now())
+}

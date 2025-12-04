@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,17 +8,18 @@ import { JobForm } from "@/components/forms/job-form"
 import type { JobFormData } from "@/lib/form-types"
 import { allJobs } from "@/lib/enhanced-jobs-data"
 
-export default function EditJobPage({ params }: { params: { id: string } }) {
+export default function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const { id } = use(params)
   const [job, setJob] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const foundJob = allJobs.find((j) => j.id === params.id)
+    const foundJob = allJobs.find((j) => j.id === id)
     if (foundJob) {
       setJob(foundJob)
     }
-  }, [params.id])
+  }, [id])
 
   const handleSubmit = async (data: JobFormData) => {
     setIsLoading(true)
@@ -70,11 +71,10 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
           applicationUrl: job.applicationUrl,
           applicationEmail: job.applicationEmail,
           tags: job.tags || [],
-          featured: job.featured || false,
           expiryDate: job.expiryDate || "",
         }}
         onSubmit={handleSubmit}
-        isLoading={isLoading}
+        isSubmitting={isLoading}
       />
     </div>
   )

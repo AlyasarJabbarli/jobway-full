@@ -8,6 +8,7 @@ import type { JobFormData } from "@/lib/form-types"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { apiClient } from "@/lib/api-client"
 
 export default function NewJobPage() {
   const router = useRouter()
@@ -16,12 +17,19 @@ export default function NewJobPage() {
   const handleSubmit = async (data: JobFormData) => {
     setIsLoading(true)
     try {
-      // In a real app, this would make an API call
-      console.log("Creating job:", data)
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      const payload: any = {
+        ...data,
+        companyId: data.company,
+        salary_min: data.salary.min,
+        salary_max: data.salary.max,
+      }
+      delete payload.company
+      delete payload.salary
+      await apiClient.createJob(payload)
       router.push("/admin/jobs")
     } catch (error) {
       console.error("Error creating job:", error)
+      // Optionally, show a toast or error message here
     } finally {
       setIsLoading(false)
     }
@@ -43,7 +51,7 @@ export default function NewJobPage() {
           </div>
         </div>
 
-        <JobForm onSubmit={handleSubmit} isLoading={isLoading} />
+        <JobForm onSubmit={handleSubmit} isSubmitting={isLoading} />
       </div>
     </AdminLayout>
   )

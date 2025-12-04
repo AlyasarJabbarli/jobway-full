@@ -15,34 +15,29 @@ export interface JobFormData {
   tags: string[]
   applicationEmail: string
   applicationUrl?: string
-  expiryDate: string
+  expiryDate: string | "",
+  category: string
+  experience: string
+  is_premium: boolean
 }
 
 export interface CompanyFormData {
   name: string
-  logo: string
-  description: string
-  website: string
-  email: string
-  phone: string
-  address: string
-  industry: string
-  size: string
-  benefits: string[]
-  socialLinks: {
-    linkedin?: string
-    twitter?: string
-    facebook?: string
-  }
+  logoUrl?: string
+  logo?: File
+  location?: string
+  description?: string
+  website?: string
+  email?: string
+  phone?: string
 }
 
 export interface ModeratorFormData {
   name: string
   email: string
-  avatar: string
   role: "admin" | "moderator"
-  permissions: string[]
-  active: boolean
+  isActive: boolean
+  password?: string
 }
 
 export interface BannerFormData {

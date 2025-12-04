@@ -1,53 +1,76 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { use, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AdminLayout } from "@/components/admin/admin-layout"
+import { Button } from "@/components/ui/button"
 import { JobForm } from "@/components/forms/job-form"
 import type { JobFormData } from "@/lib/form-types"
-import { allJobs } from "@/lib/enhanced-jobs-data"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { apiClient } from "@/lib/api-client"
+import { AdminLayout } from "@/components/admin/admin-layout"
+import { Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface EditJobPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export default function EditJobPage({ params }: EditJobPageProps) {
+  const unwrappedParams = use(params)
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
   const [job, setJob] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const foundJob = allJobs.find((j) => j.id === params.id)
-    if (foundJob) {
-      setJob(foundJob)
+    const fetchJob = async () => {
+      try {
+        setIsLoading(true)
+        const jobData = await apiClient.getJob(unwrappedParams.id)
+        setJob(jobData)
+      } catch (err) {
+        setError("Failed to load job data")
+        console.error("Error fetching job:", err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [params.id])
+
+    fetchJob()
+  }, [unwrappedParams.id])
 
   const handleSubmit = async (data: JobFormData) => {
-    setIsLoading(true)
     try {
-      // In a real app, this would make an API call
-      console.log("Updating job:", data)
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      setIsSaving(true)
+      await apiClient.updateJob(unwrappedParams.id, data)
       router.push("/admin/jobs")
-    } catch (error) {
-      console.error("Error updating job:", error)
+    } catch (err) {
+      console.error("Error updating job:", err)
+      setError("Failed to update job")
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
-  if (!job) {
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading job data...</span>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (error || !job) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold">Job not found</h2>
-          <p className="text-gray-600 mt-2">The job you're looking for doesn't exist.</p>
+          <h2 className="text-xl font-semibold">Error</h2>
+          <p className="text-gray-600 mt-2">{error || "Job not found"}</p>
           <Button asChild className="mt-4">
             <Link href="/admin/jobs">Back to Jobs</Link>
           </Button>
@@ -58,11 +81,15 @@ export default function EditJobPage({ params }: EditJobPageProps) {
 
   const initialData: Partial<JobFormData> = {
     title: job.title,
-    company: job.company,
+    company: job.companyId,
     location: job.location,
-    type: "full-time",
+    type: job.type,
     remote: job.location === "Remote",
-    salary: job.salary || { min: 0, max: 0, currency: "USD" },
+    salary: {
+      min: job.salary_min,
+      max: job.salary_max,
+      currency: "USD",
+    },
     description: job.description,
     requirements: job.requirements || [],
     benefits: job.benefits || [],
@@ -70,25 +97,25 @@ export default function EditJobPage({ params }: EditJobPageProps) {
     applicationEmail: job.applicationEmail || "",
     applicationUrl: job.applicationUrl || "",
     expiryDate: job.expiryDate || "",
+    category: job.category || "",
+    experience: job.experience || "",
+    is_premium: job.is_premium || false,
   }
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/jobs">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Jobs
-            </Link>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Edit Job</h1>
+          <Button asChild variant="outline">
+            <Link href="/admin/jobs">Back to Jobs</Link>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Job</h1>
-            <p className="text-gray-600">Update job posting details</p>
-          </div>
         </div>
-
-        <JobForm initialData={initialData} onSubmit={handleSubmit} isLoading={isLoading} />
+        <JobForm
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          isSubmitting={isSaving}
+        />
       </div>
     </AdminLayout>
   )

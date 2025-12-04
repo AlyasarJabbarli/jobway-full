@@ -1,53 +1,78 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { AdminLayout } from "@/components/admin/admin-layout"
+import { Button } from "@/components/ui/button"
 import { BannerForm } from "@/components/forms/banner-form"
 import type { BannerFormData } from "@/lib/form-types"
-import { sponsorshipBanners } from "@/lib/banner-management-data"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { apiClient } from "@/lib/api-client"
+import { AdminLayout } from "@/components/admin/admin-layout"
+import { Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface EditBannerPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function EditBannerPage({ params }: EditBannerPageProps) {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const { id } = use(params)
   const [banner, setBanner] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const foundBanner = sponsorshipBanners.find((b) => b.id === params.id)
-    if (foundBanner) {
-      setBanner(foundBanner)
+    const fetchBanner = async () => {
+      try {
+        setIsLoading(true)
+        const bannerData = await apiClient.getBanner(id)
+        setBanner(bannerData)
+      } catch (err) {
+        setError("Failed to load banner data")
+        console.error("Error fetching banner:", err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [params.id])
+
+    fetchBanner()
+  }, [id])
 
   const handleSubmit = async (data: BannerFormData) => {
-    setIsLoading(true)
     try {
-      // In a real app, this would make an API call
-      console.log("Updating banner:", data)
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      setIsSaving(true)
+      await apiClient.updateBanner(id, data)
       router.push("/admin/banners")
-    } catch (error) {
-      console.error("Error updating banner:", error)
+    } catch (err) {
+      console.error("Error updating banner:", err)
+      setError("Failed to update banner")
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
-  if (!banner) {
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading banner data...</span>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (error || !banner) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold">Banner not found</h2>
-          <p className="text-gray-600 mt-2">The banner you're looking for doesn't exist.</p>
+          <h2 className="text-xl font-semibold">Error</h2>
+          <p className="text-gray-600 mt-2">{error || "Banner not found"}</p>
           <Button asChild className="mt-4">
             <Link href="/admin/banners">Back to Banners</Link>
           </Button>
@@ -62,28 +87,25 @@ export default function EditBannerPage({ params }: EditBannerPageProps) {
     url: banner.targetUrl,
     position: banner.position,
     active: banner.isActive,
-    order: banner.displayOrder,
-    startDate: banner.startDate ? banner.startDate.toISOString().split("T")[0] : "",
-    endDate: banner.endDate ? banner.endDate.toISOString().split("T")[0] : "",
+    order: banner.displayOrder || 0,
+    startDate: banner.startDate || "",
+    endDate: banner.endDate || "",
   }
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/banners">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Banners
-            </Link>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Edit Banner</h1>
+          <Button asChild variant="outline">
+            <Link href="/admin/banners">Back to Banners</Link>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Banner</h1>
-            <p className="text-gray-600">Update banner details and settings</p>
-          </div>
         </div>
-
-        <BannerForm initialData={initialData} onSubmit={handleSubmit} isLoading={isLoading} />
+        <BannerForm
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          isSubmitting={isSaving}
+        />
       </div>
     </AdminLayout>
   )

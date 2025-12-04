@@ -17,18 +17,38 @@ export default function NewCompanyPage() {
     try {
       setIsLoading(true)
 
-      // Simulate API call to create company
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const data = new FormData()
+      data.append("name", formData.name)
+      if (formData.location) data.append("location", formData.location)
+      if (formData.description) data.append("description", formData.description)
+      if (formData.logo) data.append("logo", formData.logo)
+      if (formData.website) data.append("website", formData.website)
+      if (formData.email) data.append("email", formData.email)
+      if (formData.phone) data.append("phone", formData.phone)
 
-      console.log("Creating new company:", formData)
+      const res = await fetch("/api/companies", {
+        method: "POST",
+        body: data,
+      })
 
-      // In a real app, you would make an API call here
-      // await createCompany(formData)
+      if (!res.ok) {
+        let errorMessage = "Unknown error"
+        try {
+          const text = await res.text()
+          errorMessage = JSON.parse(text).error || text
+        } catch {
+          errorMessage = "Server returned an invalid response or no details."
+        }
+        console.error("API error:", errorMessage)
+        alert("Failed to create company: " + errorMessage)
+        return
+      }
 
       // Redirect back to companies list
       router.push("/admin/companies")
     } catch (err) {
       console.error("Error creating company:", err)
+      alert("Failed to create company. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -55,7 +75,7 @@ export default function NewCompanyPage() {
 
         {/* Company Form */}
         <div className="max-w-4xl">
-          <CompanyForm onSubmit={handleSubmit} isLoading={isLoading} />
+          <CompanyForm onSubmit={handleSubmit} isSubmitting={isLoading} />
         </div>
       </div>
     </AdminLayout>

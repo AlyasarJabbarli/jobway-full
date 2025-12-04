@@ -7,24 +7,25 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { companiesData } from "@/lib/companies-data"
+import { useCompaniesData } from "@/lib/banner-management-data"
 import { Plus, Search, Edit, Trash2, Eye, MapPin, Users, Calendar, Briefcase, Globe } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminCompaniesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [industryFilter, setIndustryFilter] = useState("all")
+  const { companies, isLoading, error } = useCompaniesData()
 
-  const filteredCompanies = companiesData.filter((company) => {
+  const filteredCompanies = companies.filter((company) => {
     const matchesSearch =
-      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.industry.toLowerCase().includes(searchTerm.toLowerCase())
+      company.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.industry?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesIndustry = industryFilter === "all" || company.industry === industryFilter
     return matchesSearch && matchesIndustry
   })
 
-  const industries = [...new Set(companiesData.map((c) => c.industry))]
+  const industries = [...new Set(companies.map((c) => c.industry))]
 
   return (
     <AdminLayout>
@@ -47,7 +48,7 @@ export default function AdminCompaniesPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{companiesData.length}</div>
+              <div className="text-2xl font-bold">{companies.length}</div>
               <p className="text-sm text-gray-600">Total Companies</p>
             </CardContent>
           </Card>
@@ -60,7 +61,7 @@ export default function AdminCompaniesPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold text-green-600">
-                {companiesData.reduce((sum, company) => sum + company.jobCount, 0)}
+                {companies.reduce((sum, company) => sum + (company.jobCount || (company.jobs ? company.jobs.length : 0)), 0)}
               </div>
               <p className="text-sm text-gray-600">Total Jobs</p>
             </CardContent>
@@ -68,7 +69,7 @@ export default function AdminCompaniesPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold text-purple-600">
-                {companiesData.filter((c) => c.location === "Remote").length}
+                {companies.filter((c) => c.location === "Remote").length}
               </div>
               <p className="text-sm text-gray-600">Remote Companies</p>
             </CardContent>
@@ -120,17 +121,19 @@ export default function AdminCompaniesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-lg font-semibold">{company.name}</h3>
-                        <Badge variant="outline">{company.industry}</Badge>
+                        {company.industry !== 'N/A' && <Badge variant="outline">{company.industry}</Badge>}
                       </div>
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
                           <span>{company.location}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          <span>{company.size}</span>
-                        </div>
+                        {company.size !== 'N/A' &&
+                          <div className="flex items-center gap-1">
+                            <Users className="h-4 w-4" />
+                            <span>{company.size}</span>
+                          </div>
+                        }
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
                           <span>Founded {company.founded}</span>
@@ -141,17 +144,19 @@ export default function AdminCompaniesPage() {
                         </div>
                       </div>
                       <p className="text-gray-600 text-sm line-clamp-2 mb-3">{company.description}</p>
-                      <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        <a
-                          href={company.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          {company.website}
-                        </a>
-                      </div>
+                      {company.website !== '#' && 
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-gray-400" />
+                          <a
+                            href={company.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            {company.website}
+                          </a>
+                        </div>
+                      }
                     </div>
                   </div>
 
@@ -192,6 +197,17 @@ export default function AdminCompaniesPage() {
               </Button>
             </CardContent>
           </Card>
+        )}
+
+        {isLoading && (
+          <div className="text-center py-12">
+            <p className="text-gray-600">Loading companies...</p>
+          </div>
+        )}
+        {error && (
+          <div className="text-center py-12">
+            <p className="text-red-600">{error.message}</p>
+          </div>
         )}
       </div>
     </AdminLayout>

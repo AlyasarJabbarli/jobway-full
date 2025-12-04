@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,38 +9,56 @@ import { ResponsiveBannerContainer } from "@/components/responsive-banner-contai
 import { ContentAwareLayout } from "@/components/content-aware-layout"
 import { Footer } from "@/components/footer"
 import { ArrowRight, Star, Users, Zap } from "lucide-react"
+import { fetchJobs, type Job } from "@/lib/enhanced-jobs-data"
+import { useEffect, useState } from "react"
 
-const featuredJobs = [
-  {
-    id: "1",
-    title: "Senior Frontend Developer",
-    company: "TechCorp Inc.",
-    location: "San Francisco",
-    description: "Join our team to build cutting-edge web applications using React and Next.js.",
-    type: "Premium" as const,
-    category: "Engineering",
-  },
-  {
-    id: "2",
-    title: "Product Marketing Manager",
-    company: "StartupXYZ",
-    location: "Remote",
-    description: "Lead our product marketing efforts and drive growth through strategic campaigns.",
-    type: "Premium" as const,
-    category: "Marketing",
-  },
-  {
-    id: "3",
-    title: "UX/UI Designer",
-    company: "DesignStudio",
-    location: "New York",
-    description: "Create beautiful and intuitive user experiences for our digital products.",
-    type: "Premium" as const,
-    category: "Design",
-  },
-]
+// Helper to pick featured jobs according to the rules
+async function getFeaturedJobs(): Promise<Job[]> {
+  const jobs = await fetchJobs()
+  if (!jobs || jobs.length === 0) return []
+
+  const premium = jobs.filter(
+    (j: any) => j.type === "Premium" || j.is_premium === true
+  )
+  const simple = jobs.filter(
+    (j: any) => !(j.type === "Premium" || j.is_premium === true)
+  )
+
+  // Take up to 6 premium jobs first
+  let featured: Job[] = premium.slice(0, 6)
+
+  // Ensure at least 3 cards by adding simple jobs if needed
+  if (featured.length < 3) {
+    featured = [...featured, ...simple.slice(0, 3 - featured.length)]
+  }
+
+  // If we still have fewer than 6 jobs, fill with remaining simple jobs
+  if (featured.length < 6) {
+    const remainingSlots = 6 - featured.length
+    featured = [...featured, ...simple.slice(3 - premium.length, 3 - premium.length + remainingSlots)]
+  }
+
+  return featured
+}
 
 export default function HomePage() {
+  const [featuredJobs, setFeaturedJobs] = useState<Job[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const jobs = await getFeaturedJobs()
+        setFeaturedJobs(jobs)
+      } catch (err) {
+        console.error("Error loading featured jobs", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -84,29 +104,51 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {loading && (
+                <p className="text-center col-span-full text-gray-500">Loading featured jobs...</p>
+              )}
               {featuredJobs.map((job) => (
-                <Card key={job.id} className="border-yellow-400 bg-yellow-50/30 hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <p className="text-gray-600 text-sm">
-                          {job.company} • {job.location}
-                        </p>
+                <Link key={job.id} href={`/jobs/${job.id}`} className="block h-full group" tabIndex={0}>
+                  <Card
+                    className={
+                      `${job.type === "Premium" || (job as any).is_premium ? "border-yellow-400 bg-yellow-50/30" : "border-gray-200 bg-white"} group-hover:shadow-lg transition-shadow cursor-pointer h-full`
+                    }
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">{job.title}</CardTitle>
+                          {(() => {
+                            const companyName = typeof (job as any).company === "string"
+                              ? (job as any).company
+                              : (job as any).company?.name ?? "Unknown Company"
+                            return (
+                              <p className="text-gray-600 text-sm">
+                                {companyName} • {job.location}
+                              </p>
+                            )
+                          })()}
+                        </div>
+                        {job.type === "Premium" || (job as any).is_premium ? (
+                          <Badge className="bg-yellow-500 hover:bg-yellow-600">
+                            <Star className="h-3 w-3 mr-1" />
+                            Premium
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            Simple
+                          </Badge>
+                        )}
                       </div>
-                      <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                        <Star className="h-3 w-3 mr-1" />
-                        Premium
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-600 text-sm mb-3">{job.description}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {job.category}
                       </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600 text-sm mb-3">{job.description}</p>
-                    <Badge variant="outline" className="text-xs">
-                      {job.category}
-                    </Badge>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
 

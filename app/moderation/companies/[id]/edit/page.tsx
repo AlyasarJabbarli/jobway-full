@@ -1,29 +1,42 @@
-"use client"
-
+import React from "react"
 import { ModerationLayout } from "@/components/moderation/moderation-layout"
 import { CompanyForm } from "@/components/forms/company-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { companiesData } from "@/lib/companies-data"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import type { CompanyFormData } from "@/lib/form-types"
+import { getCurrentModerator, getModerationStats } from "@/lib/moderation-data"
+import { db } from "@/lib/db"
+import EditCompanyClient from "./EditCompanyClient"
 
 interface EditModerationCompanyPageProps {
-  params: {
-    id: string
-  }
+  params: { id: string }
 }
 
-export default function EditModerationCompanyPage({ params }: EditModerationCompanyPageProps) {
-  const company = companiesData.find((c) => c.id === params.id)
+export default async function EditModerationCompanyPage({ params }: EditModerationCompanyPageProps) {
+  const moderator = await getCurrentModerator()
+  const stats = await getModerationStats()
+  const safeModerator = {
+    ...moderator,
+    name: moderator.name ?? 'Moderator',
+    isActive: typeof moderator.isActive === 'boolean' ? moderator.isActive : true,
+  }
+
+  const company = await db.company.findUnique({
+    where: { id: params.id },
+  })
 
   if (!company) {
-    notFound()
+    return (
+      <ModerationLayout moderator={safeModerator} stats={stats}>
+        <div>Company not found</div>
+      </ModerationLayout>
+    )
   }
 
   return (
-    <ModerationLayout>
+    <ModerationLayout moderator={safeModerator} stats={stats}>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="sm" asChild>
@@ -43,7 +56,7 @@ export default function EditModerationCompanyPage({ params }: EditModerationComp
             <CardTitle>Company Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <CompanyForm initialData={company} />
+            <EditCompanyClient initialData={company} id={params.id} />
           </CardContent>
         </Card>
       </div>

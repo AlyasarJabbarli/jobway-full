@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { allJobs } from "@/lib/enhanced-jobs-data"
+import { headers } from "next/headers"
+import type { Job } from "@/lib/enhanced-jobs-data"
 import {
   MapPin,
   Building2,
@@ -24,49 +25,85 @@ import {
   Award,
 } from "lucide-react"
 
-interface JobDetailPageProps {
-  params: {
-    id: string
-  }
-}
+// A helper type used only in this file – adds a human-readable postedDate string.
+type DisplayJob = Job & { postedDate: string }
 
-export default function JobDetailPage({ params }: JobDetailPageProps) {
-  const job = allJobs.find((j) => j.id === params.id)
+export default async function JobDetailPage(props: { params: { id: string } }) {
+  const params = await props.params;
+  // Since this is a server component, we need to use absolute URLs
+  const hostHeader = await headers();
+  const host = hostHeader.get("host");
+  const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
+  const baseUrl = `${protocol}://${host}/api`
 
-  if (!job) {
+  // Fetch the specific job and related jobs
+  const [jobRes, allJobsRes] = await Promise.all([
+    fetch(`${baseUrl}/jobs/${params.id}`, { cache: "no-store" }),
+    fetch(`${baseUrl}/jobs`, { cache: "no-store" }),
+  ])
+
+  if (!jobRes.ok) {
     notFound()
   }
 
+  const matchedJob = await jobRes.json()
+  const allJobs = await allJobsRes.json()
+
+  // Transform API response to match our Job interface
+  const transformJob = (apiJob: any): Job => ({
+    id: apiJob.id,
+    title: apiJob.title,
+    company: typeof apiJob.company === "string" ? apiJob.company : apiJob.company?.name ?? "Unknown Company",
+    companyId: typeof apiJob.company === "object" ? apiJob.company.id : undefined,
+    location: apiJob.location,
+    category: apiJob.category,
+    type: apiJob.type ?? (apiJob.is_premium ? "Premium" : "Simple"),
+    is_premium: apiJob.is_premium || false,
+    salary: {
+      min: apiJob.salary?.min ?? apiJob.salary_min,
+      max: apiJob.salary?.max ?? apiJob.salary_max,
+    },
+    experience: apiJob.experience,
+    industry: apiJob.industry ?? "",
+    description: apiJob.description,
+    requirements: apiJob.requirements ?? [],
+    benefits: apiJob.benefits ?? [],
+    companyLogo: apiJob.company?.logoUrl ?? undefined,
+    datePosted: new Date(apiJob.datePosted ?? apiJob.createdAt),
+    employmentType: apiJob.employmentType,
+    teamSize: apiJob.teamSize,
+    responsibilities: apiJob.responsibilities ?? [],
+  })
+
+  // Transform the matched job
+  const transformedJob = transformJob(matchedJob)
+
+  // Prepare the job object for display (add a formatted postedDate string)
+  const job: DisplayJob = {
+    ...transformedJob,
+    postedDate: new Date(matchedJob!.createdAt).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }),
+  }
+
   // Get related jobs (same category, excluding current job)
-  const relatedJobs = allJobs.filter((j) => j.category === job.category && j.id !== job.id).slice(0, 3)
+  const relatedJobs: DisplayJob[] = allJobs
+    .filter((j: any) => j.category === job.category && j.id !== job.id)
+    .slice(0, 3)
+    .map((j: any) => ({
+      ...transformJob(j),
+      postedDate: new Date(j.createdAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+    }))
 
   // Extended job details
   const jobDetails = {
     ...job,
-    employmentType: "Full-time",
-    teamSize: "10-50 employees",
-    benefits: [
-      "Health, dental, and vision insurance",
-      "401(k) with company matching",
-      "Flexible work arrangements",
-      "Professional development budget",
-      "Unlimited PTO",
-      "Stock options",
-    ],
-    requirements: [
-      "Bachelor's degree in relevant field or equivalent experience",
-      "Strong communication and collaboration skills",
-      "Experience with modern development tools and practices",
-      "Problem-solving mindset and attention to detail",
-      "Ability to work in a fast-paced environment",
-    ],
-    responsibilities: [
-      "Design and develop high-quality software solutions",
-      "Collaborate with cross-functional teams to deliver projects",
-      "Participate in code reviews and maintain coding standards",
-      "Contribute to technical documentation and knowledge sharing",
-      "Stay updated with industry trends and best practices",
-    ],
     companyInfo: {
       size: "500-1000 employees",
       founded: "2015",
@@ -97,27 +134,34 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Job Header */}
+            <div className="lg:col-span-2">
               <Card>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <h1 className="text-xl md:text-2xl font-bold text-gray-900">{job.title}</h1>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-4">
+                        <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
                         <Badge
                           variant={job.type === "Premium" ? "default" : "secondary"}
                           className={job.type === "Premium" ? "bg-yellow-500 hover:bg-yellow-600" : ""}
                         >
-                          {job.type === "Premium" && <Star className="h-3 w-3 mr-1" />}
                           {job.type}
                         </Badge>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
                         <div className="flex items-center space-x-1">
                           <Building2 className="h-4 w-4" />
-                          <span>{job.company}</span>
+                          {job.companyId ? (
+                            <Link
+                              href={`/companies/${job.companyId}`}
+                              className="hover:text-blue-600 transition-colors"
+                            >
+                              {job.company}
+                            </Link>
+                          ) : (
+                            <span>{job.company}</span>
+                          )}
                         </div>
                         <div className="flex items-center space-x-1">
                           <MapPin className="h-4 w-4" />
@@ -142,7 +186,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                         </Badge>
                         <Badge variant="outline" className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {jobDetails.employmentType}
+                          {job.employmentType || "Full-time"}
                         </Badge>
                         <Badge variant="outline" className="flex items-center gap-1">
                           <Award className="h-3 w-3" />
@@ -161,236 +205,152 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       </Button>
                     </div>
                   </div>
-                </CardHeader>
-              </Card>
 
-              {/* Job Description */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Job Description</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-gray-700 leading-relaxed">{job.description}</p>
-                  <p className="text-gray-700 leading-relaxed">
-                    We are looking for a talented professional to join our growing team. This role offers an excellent
-                    opportunity to work with cutting-edge technologies and contribute to meaningful projects that impact
-                    thousands of users worldwide.
-                  </p>
-                </CardContent>
-              </Card>
+                  <div className="prose max-w-none">
+                    <p className="whitespace-pre-wrap">{job.description}</p>
+                  </div>
 
-              {/* Responsibilities */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Key Responsibilities</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {jobDetails.responsibilities.map((responsibility, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="text-blue-600 mr-2">•</span>
-                        <span className="text-gray-700">{responsibility}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+                  <div className="mt-8 space-y-6">
+                    {/* Responsibilities - Only show if we have any */}
+                    {job.responsibilities && job.responsibilities.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Key Responsibilities</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {job.responsibilities.map((responsibility: string, index: number) => (
+                              <li key={index} className="flex items-start">
+                                <span className="text-blue-600 mr-2">•</span>
+                                <span className="text-gray-700">{responsibility}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
 
-              {/* Requirements */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Requirements</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {jobDetails.requirements.map((requirement, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="text-blue-600 mr-2">•</span>
-                        <span className="text-gray-700">{requirement}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+                    {/* Requirements - Only show if we have any */}
+                    {job.requirements && job.requirements.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Requirements</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {job.requirements.map((requirement: string, index: number) => (
+                              <li key={index} className="flex items-start">
+                                <span className="text-blue-600 mr-2">•</span>
+                                <span className="text-gray-700">{requirement}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
 
-              {/* Benefits */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Benefits & Perks</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {jobDetails.benefits.map((benefit, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="text-green-600 mr-2">✓</span>
-                        <span className="text-gray-700">{benefit}</span>
-                      </li>
-                    ))}
-                  </ul>
+                    {/* Benefits - Only show if we have any */}
+                    {job.benefits && job.benefits.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Benefits & Perks</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {job.benefits.map((benefit: string, index: number) => (
+                              <li key={index} className="flex items-start">
+                                <span className="text-green-600 mr-2">✓</span>
+                                <span className="text-gray-700">{benefit}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Apply Card */}
-              <Card className="sticky top-24">
-                <CardHeader>
-                  <CardTitle>Apply for this position</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-xl md:text-2xl font-bold text-green-600 mb-1">
-                      ${job.salary.min.toLocaleString()} - ${job.salary.max.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-600">Annual Salary</div>
-                  </div>
-                  <Button size="lg" className="w-full" asChild>
-                    <a
-                      href={`mailto:jobs@example.com?subject=Application for ${job.title}&body=I am interested in applying for the ${job.title} position at ${job.company}.`}
-                    >
-                      Apply Now
-                    </a>
-                  </Button>
-                  <Button variant="outline" size="lg" className="w-full" asChild>
-                    <a href="https://forms.google.com/your-form-id" target="_blank" rel="noopener noreferrer">
-                      Quick Apply
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
-                  <Separator />
-                  <div className="text-sm text-gray-600 space-y-2">
-                    <p>
-                      <strong>Application Deadline:</strong> Open until filled
-                    </p>
-                    <p>
-                      <strong>Start Date:</strong> Immediate
-                    </p>
-                    <p>
-                      <strong>Experience Required:</strong> {job.experience}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Company Info */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <img
-                      src={jobDetails.companyInfo.logo || "/placeholder.svg"}
-                      alt={`${job.company} logo`}
-                      className="w-12 h-12 rounded-lg border"
-                    />
-                    <div>
-                      <CardTitle className="text-lg">{job.company}</CardTitle>
-                      <p className="text-sm text-gray-600">{job.industry}</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Industry:</span>
-                    <span className="font-medium">{job.industry}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Company Size:</span>
-                    <span className="font-medium">{jobDetails.companyInfo.size}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Founded:</span>
-                    <span className="font-medium">{jobDetails.companyInfo.founded}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Team Size:</span>
-                    <span className="font-medium">{jobDetails.teamSize}</span>
-                  </div>
-                  <Separator />
-                  <Button variant="outline" className="w-full" asChild>
-                    <a href={jobDetails.companyInfo.website} target="_blank" rel="noopener noreferrer">
-                      Visit Company Website
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Job Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Job Statistics</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Applications:</span>
-                    <span className="font-medium">47 candidates</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Views:</span>
-                    <span className="font-medium">1,234 views</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Posted:</span>
-                    <span className="font-medium">{job.postedDate}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Experience Level:</span>
-                    <span className="font-medium">{job.experience}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Related Jobs */}
-          {relatedJobs.length > 0 && (
-            <div className="mt-12">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">Similar Jobs</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {relatedJobs.map((relatedJob) => (
-                  <Card key={relatedJob.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">
-                            <Link href={`/jobs/${relatedJob.id}`} className="hover:text-blue-600 transition-colors">
-                              {relatedJob.title}
-                            </Link>
-                          </CardTitle>
-                          <p className="text-gray-600 text-sm">
-                            {relatedJob.company} • {relatedJob.location}
-                          </p>
-                          <p className="text-green-600 text-sm font-medium">
-                            ${relatedJob.salary.min.toLocaleString()} - ${relatedJob.salary.max.toLocaleString()}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={relatedJob.type === "Premium" ? "default" : "secondary"}
-                          className={relatedJob.type === "Premium" ? "bg-yellow-500 hover:bg-yellow-600" : ""}
-                        >
-                          {relatedJob.type}
-                        </Badge>
+            <div>
+              <div className="space-y-6">
+                {/* Company Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Company Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="h-16 w-16 relative">
+                        <img
+                          src={job.companyLogo || jobDetails.companyInfo.logo}
+                          alt={`${job.company} logo`}
+                          className="rounded-lg object-contain"
+                        />
                       </div>
+                      <div>
+                        <h3 className="font-semibold">{job.company}</h3>
+                        <p className="text-sm text-gray-600">{job.location}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-gray-600 space-y-2">
+                      <p>
+                        <strong>Application Deadline:</strong> Open until filled
+                      </p>
+                      <p>
+                        <strong>Start Date:</strong> Immediate
+                      </p>
+                      {job.teamSize && (
+                        <p>
+                          <strong>Team Size:</strong> {job.teamSize}
+                        </p>
+                      )}
+                      <p>
+                        <strong>Experience Required:</strong> {job.experience}
+                      </p>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    <Button className="w-full" asChild>
+                      <Link href={`/jobs/${job.id}/apply`}>Apply Now</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Related Jobs */}
+                {relatedJobs.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Similar Jobs</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-gray-600 text-sm mb-3">{relatedJob.description}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-1">
-                          <Badge variant="outline" className="text-xs">
-                            {relatedJob.category}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {relatedJob.experience}
-                          </Badge>
-                        </div>
-                        <span className="text-xs text-gray-500">{relatedJob.postedDate}</span>
+                      <div className="space-y-4">
+                        {relatedJobs.map((relatedJob) => (
+                          <Link
+                            key={relatedJob.id}
+                            href={`/jobs/${relatedJob.id}`}
+                            className="block hover:bg-gray-50 rounded-lg p-3 -mx-3 transition-colors"
+                          >
+                            <div className="flex items-start justify-between mb-1">
+                              <h3 className="font-medium text-gray-900">{relatedJob.title}</h3>
+                              <Badge variant="outline">{relatedJob.type}</Badge>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              <p>{relatedJob.company}</p>
+                              <p>{relatedJob.location}</p>
+                            </div>
+                          </Link>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       </ContentAwareLayout>
 

@@ -1,15 +1,22 @@
-"use client"
-
 import { ModerationLayout } from "@/components/moderation/moderation-layout"
 import { JobForm } from "@/components/forms/job-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { getCurrentModerator, getModerationStats } from "@/lib/moderation-data"
 
-export default function NewModerationJobPage() {
+export default async function NewModerationJobPage() {
+  const moderator = await getCurrentModerator()
+  const stats = await getModerationStats()
+  const safeModerator = {
+    ...moderator,
+    name: moderator.name ?? 'Moderator',
+    isActive: typeof moderator.isActive === 'boolean' ? moderator.isActive : true,
+  }
+
   return (
-    <ModerationLayout>
+    <ModerationLayout moderator={safeModerator} stats={stats}>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="sm" asChild>

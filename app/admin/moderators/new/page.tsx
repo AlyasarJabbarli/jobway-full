@@ -8,6 +8,7 @@ import type { ModeratorFormData } from "@/lib/form-types"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { apiClient } from "@/lib/api-client"
 
 export default function NewModeratorPage() {
   const router = useRouter()
@@ -16,12 +17,11 @@ export default function NewModeratorPage() {
   const handleSubmit = async (data: ModeratorFormData) => {
     setIsLoading(true)
     try {
-      // In a real app, this would make an API call
-      console.log("Creating moderator:", data)
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      await apiClient.createModerator(data)
       router.push("/admin/moderators")
     } catch (error) {
       console.error("Error creating moderator:", error)
+      // Optionally, show a toast or error message here
     } finally {
       setIsLoading(false)
     }
@@ -43,7 +43,7 @@ export default function NewModeratorPage() {
           </div>
         </div>
 
-        <ModeratorForm onSubmit={handleSubmit} isLoading={isLoading} />
+        <ModeratorForm onSubmit={handleSubmit} isSubmitting={isLoading} />
       </div>
     </AdminLayout>
   )

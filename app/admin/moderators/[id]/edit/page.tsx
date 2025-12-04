@@ -1,53 +1,78 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { AdminLayout } from "@/components/admin/admin-layout"
+import { Button } from "@/components/ui/button"
 import { ModeratorForm } from "@/components/forms/moderator-form"
 import type { ModeratorFormData } from "@/lib/form-types"
-import { moderatorsData } from "@/lib/admin-data"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { apiClient } from "@/lib/api-client"
+import { AdminLayout } from "@/components/admin/admin-layout"
+import { Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface EditModeratorPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function EditModeratorPage({ params }: EditModeratorPageProps) {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const { id } = use(params)
   const [moderator, setModerator] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const foundModerator = moderatorsData.find((m) => m.id === params.id)
-    if (foundModerator) {
-      setModerator(foundModerator)
+    const fetchModerator = async () => {
+      try {
+        setIsLoading(true)
+        const moderatorData = await apiClient.getModerator(id)
+        setModerator(moderatorData)
+      } catch (err) {
+        setError("Failed to load moderator data")
+        console.error("Error fetching moderator:", err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [params.id])
+
+    fetchModerator()
+  }, [id])
 
   const handleSubmit = async (data: ModeratorFormData) => {
-    setIsLoading(true)
     try {
-      // In a real app, this would make an API call
-      console.log("Updating moderator:", data)
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      setIsSaving(true)
+      await apiClient.updateModerator(id, data)
       router.push("/admin/moderators")
-    } catch (error) {
-      console.error("Error updating moderator:", error)
+    } catch (err) {
+      console.error("Error updating moderator:", err)
+      setError("Failed to update moderator")
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
-  if (!moderator) {
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading moderator data...</span>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (error || !moderator) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold">Moderator not found</h2>
-          <p className="text-gray-600 mt-2">The moderator you're looking for doesn't exist.</p>
+          <h2 className="text-xl font-semibold">Error</h2>
+          <p className="text-gray-600 mt-2">{error || "Moderator not found"}</p>
           <Button asChild className="mt-4">
             <Link href="/admin/moderators">Back to Moderators</Link>
           </Button>
@@ -59,30 +84,27 @@ export default function EditModeratorPage({ params }: EditModeratorPageProps) {
   const initialData: Partial<ModeratorFormData> = {
     name: moderator.name,
     email: moderator.email,
-    avatar: moderator.avatar,
     role: moderator.role,
-    permissions: moderator.permissions?.map((p: any) => p.id) || [],
     active: moderator.isActive,
+    permissions: moderator.permissions || [],
   }
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/moderators">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Moderators
-            </Link>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Edit Moderator</h1>
+          <Button asChild variant="outline">
+            <Link href="/admin/moderators">Back to Moderators</Link>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Moderator</h1>
-            <p className="text-gray-600">Update moderator account details</p>
-          </div>
         </div>
-
-        <ModeratorForm initialData={initialData} onSubmit={handleSubmit} isLoading={isLoading} />
+        <ModeratorForm
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          isSubmitting={isSaving}
+        />
       </div>
     </AdminLayout>
   )
 }
+

@@ -1,23 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { CompanyForm } from "@/components/forms/company-form"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2 } from "lucide-react"
-import { getCompanyById } from "@/lib/companies-data"
+import { CompanyForm } from "@/components/forms/company-form"
 import type { CompanyFormData } from "@/lib/form-types"
+import { apiClient } from "@/lib/api-client"
+import { AdminLayout } from "@/components/admin/admin-layout"
+import { Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface EditCompanyPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function EditCompanyPage({ params }: EditCompanyPageProps) {
   const router = useRouter()
+  const { id } = use(params)
   const [company, setCompany] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -27,13 +28,7 @@ export default function EditCompanyPage({ params }: EditCompanyPageProps) {
     const fetchCompany = async () => {
       try {
         setIsLoading(true)
-        const companyData = getCompanyById(params.id)
-
-        if (!companyData) {
-          setError("Company not found")
-          return
-        }
-
+        const companyData = await apiClient.getCompany(id)
         setCompany(companyData)
       } catch (err) {
         setError("Failed to load company data")
@@ -44,21 +39,40 @@ export default function EditCompanyPage({ params }: EditCompanyPageProps) {
     }
 
     fetchCompany()
-  }, [params.id])
+  }, [id])
 
-  const handleSubmit = async (formData: CompanyFormData) => {
+  const handleSubmit = async (data: CompanyFormData) => {
     try {
       setIsSaving(true)
+      
+      // Use FormData for file uploads
+      const formData = new FormData()
+      formData.append("name", data.name)
+      if (data.location) formData.append("location", data.location)
+      if (data.description) formData.append("description", data.description)
+      if (data.logo) formData.append("logo", data.logo)
+      if (data.website) formData.append("website", data.website)
+      if (data.email) formData.append("email", data.email)
+      if (data.phone) formData.append("phone", data.phone)
 
-      // Simulate API call to update company
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await fetch(`/api/companies/${id}`, {
+        method: "PUT",
+        body: formData,
+      })
 
-      console.log("Updating company:", params.id, formData)
+      if (!response.ok) {
+        let errorMessage = "Unknown error"
+        try {
+          const text = await response.text()
+          errorMessage = JSON.parse(text).error || text
+        } catch {
+          errorMessage = "Server returned an invalid response or no details."
+        }
+        console.error("API error:", errorMessage)
+        setError("Failed to update company: " + errorMessage)
+        return
+      }
 
-      // In a real app, you would make an API call here
-      // await updateCompany(params.id, formData)
-
-      // Redirect back to companies list
       router.push("/admin/companies")
     } catch (err) {
       console.error("Error updating company:", err)
@@ -84,70 +98,38 @@ export default function EditCompanyPage({ params }: EditCompanyPageProps) {
   if (error || !company) {
     return (
       <AdminLayout>
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/companies">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Companies
-              </Link>
-            </Button>
-          </div>
-
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">{error || "Company Not Found"}</h2>
-            <p className="text-gray-600 mb-4">The company you're looking for doesn't exist or couldn't be loaded.</p>
-            <Button asChild>
-              <Link href="/admin/companies">Return to Companies List</Link>
-            </Button>
-          </div>
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold">Error</h2>
+          <p className="text-gray-600 mt-2">{error || "Company not found"}</p>
+          <Button asChild className="mt-4">
+            <Link href="/admin/companies">Back to Companies</Link>
+          </Button>
         </div>
       </AdminLayout>
     )
   }
 
-  // Transform company data to match form structure
-  const initialFormData: Partial<CompanyFormData> = {
+  const initialData: Partial<CompanyFormData> = {
     name: company.name,
-    logo: company.logo,
     description: company.description,
-    website: company.website,
-    email: company.email,
-    phone: company.phone,
-    address: company.location, // Map location to address
-    industry: company.industry,
-    size: company.size,
-    benefits: company.benefits || [],
-    socialLinks: {
-      linkedin: company.socialMedia?.linkedin,
-      twitter: company.socialMedia?.twitter,
-      facebook: company.socialMedia?.facebook,
-    },
+    logoUrl: company.logoUrl,
+    location: company.location,
   }
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/companies">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Companies
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Edit Company</h1>
-              <p className="text-gray-600">Update {company.name} information</p>
-            </div>
-          </div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Edit Company</h1>
+          <Button asChild variant="outline">
+            <Link href="/admin/companies">Back to Companies</Link>
+          </Button>
         </div>
-
-        {/* Company Form */}
-        <div className="max-w-4xl">
-          <CompanyForm initialData={initialFormData} onSubmit={handleSubmit} isLoading={isSaving} />
-        </div>
+        <CompanyForm
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          isSubmitting={isSaving}
+        />
       </div>
     </AdminLayout>
   )

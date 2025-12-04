@@ -8,14 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { currentModerator, moderationStats } from "@/lib/moderation-data"
 import { LayoutDashboard, Briefcase, Building2, Activity, Settings, Menu, LogOut, Shield } from "lucide-react"
+import { signOut } from "next-auth/react"
 
 interface ModerationLayoutProps {
   children: React.ReactNode
+  moderator: { name: string; role: string; isActive: boolean }
+  stats: { totalReviewed?: number; pendingReviews?: number; accuracy?: number; averageResponseTime?: string; totalJobs?: number; totalCompanies?: number }
 }
 
-export function ModerationLayout({ children }: ModerationLayoutProps) {
+export function ModerationLayout({ children, moderator, stats }: ModerationLayoutProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -33,8 +35,8 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
       <div className="flex items-center gap-2 p-6 border-b">
         <Shield className="h-8 w-8 text-orange-600" />
         <div>
-          <h1 className="text-xl font-bold">JobPortal</h1>
-          <p className="text-xs text-gray-500">Moderation Panel</p>
+          <h1 className="text-xl font-bold text-gray-900">JobPortal</h1>
+          <p className="text-xs text-gray-600">Moderation Panel</p>
         </div>
       </div>
 
@@ -42,21 +44,21 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
       <div className="p-6 border-b">
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarImage src={currentModerator.avatar || "/placeholder.svg"} />
+            <AvatarImage src="/user_placeholder.svg" />
             <AvatarFallback>
-              {currentModerator.name
+              {(moderator?.name || 'Moderator')
                 .split(" ")
-                .map((n) => n[0])
+                .map((n: string) => n[0])
                 .join("")}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <p className="font-medium text-sm">{currentModerator.name}</p>
+            <p className="font-medium text-sm text-gray-900">{moderator?.name || 'Moderator'}</p>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
-                {currentModerator.role}
+                {moderator?.role || 'moderator'}
               </Badge>
-              <span className={`w-2 h-2 rounded-full ${currentModerator.isActive ? "bg-green-500" : "bg-gray-400"}`} />
+              <span className={`w-2 h-2 rounded-full ${(typeof moderator?.isActive === 'boolean' ? moderator.isActive : true) ? "bg-green-500" : "bg-gray-400"}`} />
             </div>
           </div>
         </div>
@@ -66,16 +68,16 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
           <div className="bg-orange-50 p-2 rounded">
             <div className="flex items-center gap-1 text-orange-600">
               <Briefcase className="h-3 w-3" />
-              <span>Jobs Managed</span>
+              <span className="text-gray-700">Jobs Managed</span>
             </div>
-            <div className="font-semibold text-orange-700">{moderationStats.totalJobs}</div>
+            <div className="font-semibold text-orange-800">{stats?.totalJobs ?? stats?.totalReviewed ?? 0}</div>
           </div>
           <div className="bg-green-50 p-2 rounded">
             <div className="flex items-center gap-1 text-green-600">
               <Building2 className="h-3 w-3" />
-              <span>Companies Managed</span>
+              <span className="text-gray-700">Companies Managed</span>
             </div>
-            <div className="font-semibold text-green-700">{moderationStats.totalCompanies}</div>
+            <div className="font-semibold text-green-800">{stats?.totalCompanies ?? 0}</div>
           </div>
         </div>
       </div>
@@ -90,7 +92,7 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
                 <Link
                   href={item.href}
                   className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive ? "bg-orange-100 text-orange-700" : "text-gray-700 hover:bg-gray-100"
+                    isActive ? "bg-orange-100 text-orange-700" : "text-gray-800 hover:bg-gray-100"
                   }`}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -98,11 +100,6 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
                     <item.icon className="h-4 w-4" />
                     {item.name}
                   </div>
-                  {item.badge && item.badge > 0 && (
-                    <Badge variant="destructive" className="h-5 text-xs">
-                      {item.badge}
-                    </Badge>
-                  )}
                 </Link>
               </li>
             )
@@ -112,7 +109,11 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
 
       {/* Footer */}
       <div className="p-4 border-t">
-        <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+          onClick={() => signOut()}
+        >
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out
         </Button>
@@ -121,10 +122,10 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
   )
 
   return (
-    <div className="min-h-screen bg-orange-50/30">
+    <div className="min-h-screen bg-gray-50">
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r border-orange-200 overflow-y-auto">
+        <div className="flex flex-col flex-grow bg-white border-r border-gray-200 overflow-y-auto">
           <Sidebar />
         </div>
       </div>
@@ -136,7 +137,7 @@ export function ModerationLayout({ children }: ModerationLayoutProps) {
             <Menu className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetContent side="left" className="w-72 p-0 bg-white border-r border-gray-200">
           <Sidebar />
         </SheetContent>
       </Sheet>

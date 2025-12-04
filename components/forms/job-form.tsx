@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,366 +13,576 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { X, Plus } from "lucide-react"
 import type { JobFormData } from "@/lib/form-types"
-import { companiesData } from "@/lib/companies-data"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { BaseForm } from "./base-form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+
+const CATEGORY_OPTIONS = [
+  "Engineering",
+  "Marketing",
+  "Design",
+  "Sales",
+  "HR",
+  "Finance",
+  "Operations"
+];
+const EXPERIENCE_OPTIONS = [
+  "Entry-level (0-2 years)",
+  "Mid-level (3-5 years)",
+  "Senior (5+ years)",
+  "Executive (10+ years)"
+];
+
+const jobFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  company: z.string().min(1, "Company is required"),
+  location: z.string().min(1, "Location is required"),
+  type: z.string().min(1, "Job type is required"),
+  remote: z.boolean().default(false),
+  salary: z.object({
+    min: z.number().min(0),
+    max: z.number().min(0),
+    currency: z.string().default("AZN"),
+  }),
+  description: z.string().min(1, "Description is required"),
+  requirements: z.array(z.string()).default([]),
+  responsibilities: z.array(z.string()).default([]),
+  benefits: z.array(z.string()).default([]),
+  tags: z.array(z.string()).default([]),
+  applicationEmail: z.string().email().optional(),
+  applicationUrl: z.string().url().optional(),
+  expiryDate: z.string().optional(),
+  category: z.string().min(1, "Category is required"),
+  experience: z.string().min(1, "Experience is required"),
+  is_premium: z.boolean().default(false),
+})
+
+type JobFormValues = z.infer<typeof jobFormSchema>
 
 interface JobFormProps {
   initialData?: Partial<JobFormData>
   onSubmit: (data: JobFormData) => void
-  isLoading?: boolean
+  isSubmitting?: boolean
 }
 
-export function JobForm({ initialData, onSubmit, isLoading }: JobFormProps) {
-  const [formData, setFormData] = useState<JobFormData>({
-    title: initialData?.title || "",
-    company: initialData?.company || "",
-    location: initialData?.location || "",
-    type: initialData?.type || "full-time",
-    remote: initialData?.remote || false,
-    salary: initialData?.salary || { min: 0, max: 0, currency: "USD" },
-    description: initialData?.description || "",
-    requirements: initialData?.requirements || [],
-    benefits: initialData?.benefits || [],
-    tags: initialData?.tags || [],
-    applicationEmail: initialData?.applicationEmail || "",
-    applicationUrl: initialData?.applicationUrl || "",
-    expiryDate: initialData?.expiryDate || "",
-  })
-
+export function JobForm({ initialData, onSubmit, isSubmitting }: JobFormProps) {
   const [newRequirement, setNewRequirement] = useState("")
+  const [newResponsibility, setNewResponsibility] = useState("")
   const [newBenefit, setNewBenefit] = useState("")
   const [newTag, setNewTag] = useState("")
+  const [companies, setCompanies] = useState<{ id: string; name: string; location: string }[]>([])
+  const [loadingCompanies, setLoadingCompanies] = useState(true)
+
+  const form = useForm<JobFormValues>({
+    resolver: zodResolver(jobFormSchema),
+    defaultValues: {
+      title: initialData?.title || "",
+      company: initialData?.company || "",
+      location: initialData?.location || "",
+      type: initialData?.type || "full-time",
+      remote: initialData?.remote || false,
+      salary: initialData?.salary || { min: 0, max: 0, currency: "USD" },
+      description: initialData?.description || "",
+      requirements: initialData?.requirements || [],
+      responsibilities: initialData?.responsibilities || [],
+      benefits: initialData?.benefits || [],
+      tags: initialData?.tags || [],
+      applicationEmail: initialData?.applicationEmail || "",
+      applicationUrl: initialData?.applicationUrl || "",
+      expiryDate: initialData?.expiryDate || "",
+      category: initialData?.category || "",
+      experience: initialData?.experience || "",
+      is_premium: initialData?.is_premium || false,
+    },
+  })
+
+  useEffect(() => {
+    setLoadingCompanies(true)
+    fetch("/api/companies")
+      .then((res) => res.json())
+      .then((data) => setCompanies(data as { id: string; name: string; location: string }[]))
+      .finally(() => setLoadingCompanies(false))
+  }, [])
+
+  const handleSubmit = (data: JobFormValues) => {
+    let expiryDate = data.expiryDate
+    if (!expiryDate) {
+      const date = new Date()
+      date.setMonth(date.getMonth() + 1)
+      expiryDate = date.toISOString().split('T')[0]
+    }
+    onSubmit({ ...data, expiryDate } as JobFormData)
+  }
 
   const addRequirement = () => {
     if (newRequirement.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        requirements: [...prev.requirements, newRequirement.trim()],
-      }))
+      const currentRequirements = form.getValues("requirements")
+      form.setValue("requirements", [...currentRequirements, newRequirement.trim()])
       setNewRequirement("")
     }
   }
 
   const removeRequirement = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      requirements: prev.requirements.filter((_, i) => i !== index),
-    }))
+    const currentRequirements = form.getValues("requirements")
+    form.setValue(
+      "requirements",
+      currentRequirements.filter((_, i) => i !== index)
+    )
+  }
+
+  const addResponsibility = () => {
+    if (newResponsibility.trim()) {
+      const currentResponsibilities = form.getValues("responsibilities")
+      form.setValue("responsibilities", [...currentResponsibilities, newResponsibility.trim()])
+      setNewResponsibility("")
+    }
+  }
+
+  const removeResponsibility = (index: number) => {
+    const currentResponsibilities = form.getValues("responsibilities")
+    form.setValue(
+      "responsibilities",
+      currentResponsibilities.filter((_, i) => i !== index)
+    )
   }
 
   const addBenefit = () => {
     if (newBenefit.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        benefits: [...prev.benefits, newBenefit.trim()],
-      }))
+      const currentBenefits = form.getValues("benefits")
+      form.setValue("benefits", [...currentBenefits, newBenefit.trim()])
       setNewBenefit("")
     }
   }
 
   const removeBenefit = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      benefits: prev.benefits.filter((_, i) => i !== index),
-    }))
+    const currentBenefits = form.getValues("benefits")
+    form.setValue(
+      "benefits",
+      currentBenefits.filter((_, i) => i !== index)
+    )
   }
 
   const addTag = () => {
     if (newTag.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()],
-      }))
+      const currentTags = form.getValues("tags")
+      form.setValue("tags", [...currentTags, newTag.trim()])
       setNewTag("")
     }
   }
 
   const removeTag = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      tags: prev.tags.filter((_, i) => i !== index),
-    }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit(formData)
+    const currentTags = form.getValues("tags")
+    form.setValue(
+      "tags",
+      currentTags.filter((_, i) => i !== index)
+    )
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Job Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="title">Job Title</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-              required
-            />
-          </div>
+    <BaseForm
+      title="Job Details"
+      onSubmit={form.handleSubmit(handleSubmit)}
+      isSubmitting={isSubmitting}
+    >
+      <Form {...form}>
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Job Title</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div>
-            <Label htmlFor="company">Company</Label>
-            <Select
-              value={formData.company}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, company: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a company" />
-              </SelectTrigger>
-              <SelectContent>
-                {companiesData.map((company) => (
-                  <SelectItem key={company.id} value={company.name}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <FormField
+          control={form.control}
+          name="company"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Company</FormLabel>
+              <FormControl>
+                {loadingCompanies ? (
+                  <div>Loading companies...</div>
+                ) : companies.length > 0 ? (
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      const selected = companies.find((c) => c.id === value)
+                      if (selected && selected.location) {
+                        form.setValue("location", selected.location)
+                      }
+                    }}
+                    value={field.value}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div>
+                    <div>No companies found.</div>
+                    <a href="/admin/companies/new" className="text-blue-600 underline">Create a new company</a>
+                  </div>
+                )}
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div>
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              value={formData.location}
-              onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
-              required
-            />
-          </div>
+        <FormField
+          control={form.control}
+          name="location"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div>
-            <Label htmlFor="type">Job Type</Label>
-            <Select
-              value={formData.type}
-              onValueChange={(value: any) => setFormData((prev) => ({ ...prev, type: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full-time">Full Time</SelectItem>
-                <SelectItem value="part-time">Part Time</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="internship">Internship</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="remote"
-              checked={formData.remote}
-              onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, remote: checked }))}
-            />
-            <Label htmlFor="remote">Remote Work Available</Label>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Salary Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="salaryMin">Minimum Salary</Label>
-              <Input
-                id="salaryMin"
-                type="number"
-                value={formData.salary.min}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    salary: { ...prev.salary, min: Number.parseInt(e.target.value) || 0 },
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="salaryMax">Maximum Salary</Label>
-              <Input
-                id="salaryMax"
-                type="number"
-                value={formData.salary.max}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    salary: { ...prev.salary, max: Number.parseInt(e.target.value) || 0 },
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={formData.salary.currency}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    salary: { ...prev.salary, currency: value },
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+        <FormField
+          control={form.control}
+          name="type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Job Type</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select job type" />
+                  </SelectTrigger>
+                </FormControl>
                 <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="GBP">GBP</SelectItem>
+                  <SelectItem value="full-time">Full Time</SelectItem>
+                  <SelectItem value="part-time">Part Time</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Job Description</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            value={formData.description}
-            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-            rows={6}
-            required
+        <FormField
+          control={form.control}
+          name="remote"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <FormLabel>Remote Work</FormLabel>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="salary.min"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Minimum Salary</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Requirements</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              value={newRequirement}
-              onChange={(e) => setNewRequirement(e.target.value)}
-              placeholder="Add a requirement"
-              onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addRequirement())}
-            />
-            <Button type="button" onClick={addRequirement}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {formData.requirements.map((req, index) => (
-              <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                {req}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => removeRequirement(index)} />
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+          <FormField
+            control={form.control}
+            name="salary.max"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Maximum Salary</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Benefits</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              value={newBenefit}
-              onChange={(e) => setNewBenefit(e.target.value)}
-              placeholder="Add a benefit"
-              onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addBenefit())}
-            />
-            <Button type="button" onClick={addBenefit}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {formData.benefits.map((benefit, index) => (
-              <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                {benefit}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => removeBenefit(index)} />
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tags</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              placeholder="Add a tag"
-              onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-            />
-            <Button type="button" onClick={addTag}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {formData.tags.map((tag, index) => (
-              <Badge key={index} variant="outline" className="flex items-center gap-1">
-                {tag}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(index)} />
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        <FormField
+          control={form.control}
+          name="applicationEmail"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Application Email</FormLabel>
+              <FormControl>
+                <Input type="email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Application Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="applicationEmail">Application Email</Label>
-            <Input
-              id="applicationEmail"
-              type="email"
-              value={formData.applicationEmail}
-              onChange={(e) => setFormData((prev) => ({ ...prev, applicationEmail: e.target.value }))}
-              required
-            />
-          </div>
+        <FormField
+          control={form.control}
+          name="applicationUrl"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Application URL</FormLabel>
+              <FormControl>
+                <Input type="url" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div>
-            <Label htmlFor="applicationUrl">Application URL (Optional)</Label>
-            <Input
-              id="applicationUrl"
-              type="url"
-              value={formData.applicationUrl}
-              onChange={(e) => setFormData((prev) => ({ ...prev, applicationUrl: e.target.value }))}
-            />
-          </div>
+        <FormField
+          control={form.control}
+          name="expiryDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Expiry Date</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div>
-            <Label htmlFor="expiryDate">Expiry Date</Label>
-            <Input
-              id="expiryDate"
-              type="date"
-              value={formData.expiryDate}
-              onChange={(e) => setFormData((prev) => ({ ...prev, expiryDate: e.target.value }))}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Category</FormLabel>
+              <FormControl>
+                <div className="flex gap-2">
+                  <Select
+                    value={CATEGORY_OPTIONS.includes(field.value) ? field.value : ""}
+                    onValueChange={(value) => field.onChange(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORY_OPTIONS.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Or enter new category"
+                    value={!CATEGORY_OPTIONS.includes(field.value) ? field.value : ""}
+                    onChange={(e) => field.onChange(e.target.value)}
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="flex gap-4">
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Saving..." : "Save Job"}
-        </Button>
-        <Button type="button" variant="outline">
-          Cancel
-        </Button>
-      </div>
-    </form>
+        <FormField
+          control={form.control}
+          name="experience"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Experience</FormLabel>
+              <FormControl>
+                <div className="flex gap-2">
+                  <Select
+                    value={EXPERIENCE_OPTIONS.includes(field.value) ? field.value : ""}
+                    onValueChange={(value) => field.onChange(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select experience" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXPERIENCE_OPTIONS.map((exp) => (
+                        <SelectItem key={exp} value={exp}>{exp}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Or enter experience"
+                    value={!EXPERIENCE_OPTIONS.includes(field.value) ? field.value : ""}
+                    onChange={(e) => field.onChange(e.target.value)}
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="requirements"
+          render={() => (
+            <FormItem>
+              <FormLabel>Requirements</FormLabel>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="Add a requirement"
+                  value={newRequirement}
+                  onChange={(e) => setNewRequirement(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addRequirement();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={addRequirement} variant="secondary">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {form.watch("requirements").map((req, idx) => (
+                  <Badge key={idx} className="flex items-center gap-1">
+                    {req}
+                    <button type="button" onClick={() => removeRequirement(idx)}>
+                      <X className="w-3 h-3 ml-1" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="responsibilities"
+          render={() => (
+            <FormItem>
+              <FormLabel>Responsibilities</FormLabel>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="Add a responsibility"
+                  value={newResponsibility}
+                  onChange={(e) => setNewResponsibility(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addResponsibility();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={addResponsibility} variant="secondary">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {form.watch("responsibilities").map((resp, idx) => (
+                  <Badge key={idx} className="flex items-center gap-1">
+                    {resp}
+                    <button type="button" onClick={() => removeResponsibility(idx)}>
+                      <X className="w-3 h-3 ml-1" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="benefits"
+          render={() => (
+            <FormItem>
+              <FormLabel>Benefits</FormLabel>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="Add a benefit"
+                  value={newBenefit}
+                  onChange={(e) => setNewBenefit(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addBenefit();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={addBenefit} variant="secondary">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {form.watch("benefits").map((benefit, idx) => (
+                  <Badge key={idx} className="flex items-center gap-1">
+                    {benefit}
+                    <button type="button" onClick={() => removeBenefit(idx)}>
+                      <X className="w-3 h-3 ml-1" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="is_premium"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <FormLabel>Premium Listing</FormLabel>
+              </div>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </Form>
+    </BaseForm>
   )
 }

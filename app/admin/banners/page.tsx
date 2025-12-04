@@ -1,43 +1,59 @@
 "use client"
 
 import { useState } from "react"
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { sponsorshipBanners } from "@/lib/banner-management-data"
-import { BANNER_POSITIONS } from "@/lib/banner-management-types"
-import { Plus, Search, Edit, Trash2, BarChart3, Play, Pause, ExternalLink } from "lucide-react"
+import { useBanners } from "@/lib/banner-management-data"
+import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
+import { AdminLayout } from "@/components/admin/admin-layout"
 import Link from "next/link"
+import { Plus, Search, BarChart3, Edit, Trash2 } from "lucide-react"
 
 export default function BannersPage() {
+  const router = useRouter()
+  const { banners, isLoading, error, toggleBannerStatus, deleteBanner } = useBanners()
+  const typedError: any = error;
   const [searchTerm, setSearchTerm] = useState("")
-  const [positionFilter, setPositionFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [positionFilter, setPositionFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  const filteredBanners = sponsorshipBanners.filter((banner) => {
-    const matchesSearch =
-      banner.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      banner.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      banner.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Filter banners based on search term and filters
+  const filteredBanners = banners.filter((banner) => {
+    const matchesSearch = banner.title.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesPosition = positionFilter === "all" || banner.position === positionFilter
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && banner.isActive) ||
-      (statusFilter === "inactive" && !banner.isActive)
+    const matchesStatus = statusFilter === "all" || banner.isActive === (statusFilter === "active")
     return matchesSearch && matchesPosition && matchesStatus
   })
 
-  const toggleBannerStatus = (bannerId: string) => {
-    // In a real app, this would make an API call
-    console.log("Toggle banner status:", bannerId)
+  const handleToggleStatus = async (bannerId: string) => {
+    await toggleBannerStatus(bannerId)
   }
 
-  const deleteBanner = (bannerId: string) => {
-    // In a real app, this would make an API call
-    console.log("Delete banner:", bannerId)
+  const handleDelete = async (bannerId: string) => {
+    if (window.confirm("Are you sure you want to delete this banner?")) {
+      await deleteBanner(bannerId)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (typedError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-500">Error: {typedError.message}</div>
+      </div>
+    )
   }
 
   return (
@@ -46,46 +62,40 @@ export default function BannersPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Banner Management</h1>
-            <p className="text-gray-600">Create and manage sponsorship banners</p>
+            <h1 className="text-2xl font-bold text-gray-900">Sponsorship Banners</h1>
+            <p className="text-gray-600">Create, edit, and manage sponsorship banners</p>
           </div>
           <Button asChild>
             <Link href="/admin/banners/new">
               <Plus className="h-4 w-4 mr-2" />
-              Create Banner
+              Add New Banner
             </Link>
           </Button>
         </div>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{sponsorshipBanners.length}</div>
+              <div className="text-2xl font-bold">{banners.length}</div>
               <p className="text-sm text-gray-600">Total Banners</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-green-600">
-                {sponsorshipBanners.filter((b) => b.isActive).length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{banners.filter((banner) => banner.isActive).length}</div>
               <p className="text-sm text-gray-600">Active Banners</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-blue-600">
-                {sponsorshipBanners.reduce((sum, banner) => sum + banner.clickCount, 0)}
-              </div>
+              <div className="text-2xl font-bold text-blue-600">{banners.reduce((sum, banner) => sum + banner.clickCount, 0)}</div>
               <p className="text-sm text-gray-600">Total Clicks</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-purple-600">
-                {sponsorshipBanners.reduce((sum, banner) => sum + banner.impressionCount, 0)}
-              </div>
+              <div className="text-2xl font-bold text-purple-600">{banners.reduce((sum, banner) => sum + banner.impressionCount, 0)}</div>
               <p className="text-sm text-gray-600">Total Impressions</p>
             </CardContent>
           </Card>
@@ -106,20 +116,19 @@ export default function BannersPage() {
               </div>
               <Select value={positionFilter} onValueChange={setPositionFilter}>
                 <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="All Positions" />
+                  <SelectValue placeholder="Position" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Positions</SelectItem>
-                  {BANNER_POSITIONS.map((position) => (
-                    <SelectItem key={position.value} value={position.value}>
-                      {position.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="top">Top</SelectItem>
+                  <SelectItem value="sidebar">Sidebar</SelectItem>
+                  <SelectItem value="bottom">Bottom</SelectItem>
+                  <SelectItem value="inline">Inline</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="All Status" />
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -132,71 +141,29 @@ export default function BannersPage() {
         </Card>
 
         {/* Banners List */}
-        <div className="grid gap-6">
+        <div className="grid gap-4">
           {filteredBanners.map((banner) => (
             <Card key={banner.id}>
               <CardContent className="pt-6">
-                <div className="flex items-start gap-6">
-                  {/* Banner Preview */}
-                  <div className="flex-shrink-0">
-                    <img
-                      src={banner.imageUrl || "/placeholder.svg"}
-                      alt={banner.title}
-                      className="w-32 h-24 object-cover rounded-lg border"
-                    />
-                  </div>
-
-                  {/* Banner Info */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-lg font-semibold mb-1">{banner.title}</h3>
-                        {banner.description && <p className="text-gray-600 text-sm mb-2">{banner.description}</p>}
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant={banner.isActive ? "default" : "secondary"}>
-                            {banner.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                          <Badge variant="outline">
-                            {BANNER_POSITIONS.find((p) => p.value === banner.position)?.label}
-                          </Badge>
-                          <Badge variant="outline">Order: {banner.displayOrder}</Badge>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span>Clicks: {banner.clickCount}</span>
-                          <span>Impressions: {banner.impressionCount}</span>
-                          <span>
-                            CTR:{" "}
-                            {banner.impressionCount > 0
-                              ? ((banner.clickCount / banner.impressionCount) * 100).toFixed(2)
-                              : 0}
-                            %
-                          </span>
-                        </div>
-                      </div>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold">{banner.title}</h3>
+                      <Badge variant={banner.isActive ? "default" : "secondary"}>{banner.isActive ? "Active" : "Inactive"}</Badge>
+                      <Badge variant="outline">{banner.position}</Badge>
+                      {banner.tags.map((tag) => (
+                        <Badge key={tag} variant="outline">{tag}</Badge>
+                      ))}
                     </div>
-
-                    {/* Tags */}
-                    {banner.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {banner.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
+                    {banner.description && (
+                      <p className="text-gray-600 text-sm line-clamp-2 mb-2">{banner.description}</p>
                     )}
-
-                    {/* Target URL */}
-                    <div className="flex items-center gap-2 text-sm text-blue-600">
-                      <ExternalLink className="h-4 w-4" />
-                      <a href={banner.targetUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                        {banner.targetUrl}
-                      </a>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-2">
+                      <div>Clicks: {banner.clickCount}</div>
+                      <div>Impressions: {banner.impressionCount}</div>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 ml-4">
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/admin/banners/${banner.id}/analytics`}>
                         <BarChart3 className="h-4 w-4 mr-2" />
@@ -209,34 +176,10 @@ export default function BannersPage() {
                         Edit
                       </Link>
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleBannerStatus(banner.id)}
-                      className={
-                        banner.isActive
-                          ? "text-orange-600 hover:text-orange-700"
-                          : "text-green-600 hover:text-green-700"
-                      }
-                    >
-                      {banner.isActive ? (
-                        <>
-                          <Pause className="h-4 w-4 mr-2" />
-                          Pause
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Activate
-                        </>
-                      )}
+                    <Button variant="outline" size="sm" onClick={() => handleToggleStatus(banner.id)}>
+                      {banner.isActive ? "Deactivate" : "Activate"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteBanner(banner.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(banner.id)}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
                     </Button>
@@ -251,15 +194,25 @@ export default function BannersPage() {
           <Card>
             <CardContent className="text-center py-12">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No banners found</h3>
-              <p className="text-gray-600 mb-4">Try adjusting your search criteria or create a new banner.</p>
+              <p className="text-gray-600 mb-4">Try adjusting your search criteria or add a new banner.</p>
               <Button asChild>
                 <Link href="/admin/banners/new">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create First Banner
+                  Add First Banner
                 </Link>
               </Button>
             </CardContent>
           </Card>
+        )}
+        {isLoading && (
+          <div className="text-center py-12">
+            <p className="text-gray-600">Loading banners...</p>
+          </div>
+        )}
+        {typedError && (
+          <div className="text-center py-12">
+            <p className="text-red-600">{typedError?.message || String(typedError)}</p>
+          </div>
         )}
       </div>
     </AdminLayout>

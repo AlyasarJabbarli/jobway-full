@@ -2,7 +2,6 @@ import { Navigation } from "@/components/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
-import { leftBannerContent, rightBannerContent } from "@/lib/banner-data"
 import { Mail, Phone, MapPin, Users, Target, Award, Heart } from "lucide-react"
 import { ResponsiveBannerContainer } from "@/components/responsive-banner-container"
 import { ContentAwareLayout } from "@/components/content-aware-layout"
@@ -62,7 +61,7 @@ export default function AboutPage() {
       <Navigation />
 
       {/* Banner System */}
-      <ResponsiveBannerContainer leftContent={leftBannerContent} rightContent={rightBannerContent} />
+      <ResponsiveBannerContainer />
 
       <ContentAwareLayout>
         <div className="container mx-auto px-4 py-12">

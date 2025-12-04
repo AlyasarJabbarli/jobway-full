@@ -1,3 +1,5 @@
+'use client'
+
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
@@ -9,8 +11,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { getCompanyById } from "@/lib/companies-data"
-import { getJobsByCompanyId } from "@/lib/enhanced-jobs-data"
+import { apiClient } from "@/lib/api-client"
+import { use, useEffect, useState } from "react"
 import {
   ArrowLeft,
   Building2,
@@ -38,8 +40,33 @@ interface CompanyProfilePageProps {
 }
 
 export default function CompanyProfilePage({ params }: CompanyProfilePageProps) {
-  const company = getCompanyById(params.id)
-  const companyJobs = getJobsByCompanyId(params.id)
+  const { id } = use(params)
+  const [company, setCompany] = useState<any>(null)
+  const [companyJobs, setCompanyJobs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const companyData = await apiClient.getCompany(id)
+        setCompany(companyData)
+        // Fetch all jobs and filter by companyId
+        const allJobs = await apiClient.getJobs()
+        const jobsForCompany = allJobs.filter((job: any) => job.companyId === id)
+        setCompanyJobs(jobsForCompany)
+      } catch (e) {
+        setCompany(null)
+        setCompanyJobs([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [id])
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
 
   if (!company) {
     notFound()
@@ -73,38 +100,24 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                 <CardHeader>
                   <div className="flex items-start gap-6">
                     <img
-                      src={company.logo || "/placeholder.svg"}
+                      src={company.logoUrl || "/placeholder-logo.svg"}
                       alt={`${company.name} logo`}
                       className="w-20 h-20 rounded-lg border object-cover flex-shrink-0"
                     />
                     <div className="flex-1">
-                      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">{company.name}</h1>
+                      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 flex items-center gap-3">
+                        {company.name}
+                        <span className="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded">
+                          {companyJobs.length} Open Position{companyJobs.length === 1 ? '' : 's'}
+                        </span>
+                      </h1>
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-4 w-4" />
-                          <span>{company.industry}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          <span>{company.location}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          <span>{company.size}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>Founded {company.founded}</span>
-                        </div>
-                      </div>
-                      <p className="text-gray-700 mb-4">{company.description}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          <Briefcase className="h-3 w-3" />
-                          {company.jobCount} Open {company.jobCount === 1 ? "Position" : "Positions"}
-                        </Badge>
-                        <Badge variant="outline">{company.industry}</Badge>
-                        <Badge variant="outline">{company.size}</Badge>
+                        {company.location && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            <span>{company.location}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -117,47 +130,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                   <CardTitle>About {company.name}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 leading-relaxed">{company.detailedDescription}</p>
-                </CardContent>
-              </Card>
-
-              {/* Company Culture */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="h-5 w-5 text-red-500" />
-                    Company Culture
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {company.culture.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-                        <span className="text-gray-700">{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Benefits & Perks */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5 text-blue-500" />
-                    Benefits & Perks
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {company.benefits.map((benefit, index) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">✓</span>
-                        <span className="text-gray-700">{benefit}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-gray-700 leading-relaxed">{company.description}</p>
                 </CardContent>
               </Card>
 
@@ -172,7 +145,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
-                      {company.techStack.map((tech, index) => (
+                      {(company.techStack ?? []).map((tech: string, index: number) => (
                         <Badge key={index} variant="secondary" className="bg-purple-50 text-purple-700">
                           {tech}
                         </Badge>
@@ -194,7 +167,13 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                   {companyJobs.length > 0 ? (
                     <div className="space-y-4">
                       {companyJobs.map((job) => (
-                        <JobCard key={job.id} job={job} />
+                        <JobCard
+                          key={job.id}
+                          job={{
+                            ...job,
+                            company: typeof job.company === "object" ? job.company.name : job.company
+                          }}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -217,70 +196,36 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Globe className="h-4 w-4 text-gray-500" />
-                      <a
-                        href={company.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        Visit Website
-                        <ExternalLink className="inline h-3 w-3 ml-1" />
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <a href={`mailto:${company.email}`} className="text-blue-600 hover:text-blue-800 text-sm">
-                        {company.email}
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-700">{company.phone}</span>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Social Media */}
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Follow Us</h4>
-                    <div className="flex gap-2">
-                      {company.socialMedia.linkedin && (
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={company.socialMedia.linkedin} target="_blank" rel="noopener noreferrer">
-                            <Linkedin className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                      {company.socialMedia.twitter && (
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={company.socialMedia.twitter} target="_blank" rel="noopener noreferrer">
-                            <Twitter className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                      {company.socialMedia.facebook && (
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={company.socialMedia.facebook} target="_blank" rel="noopener noreferrer">
-                            <Facebook className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Quick Actions */}
-                  <div className="space-y-2">
-                    {companyJobs.length > 0 && (
-                      <Button variant="outline" className="w-full" asChild>
-                        <Link href="/jobs">View All Jobs</Link>
-                      </Button>
+                    {company.website && (
+                      <div className="flex items-center gap-3">
+                        <Globe className="h-4 w-4 text-gray-500" />
+                        <a
+                          href={company.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Visit Website
+                          <ExternalLink className="inline h-3 w-3 ml-1" />
+                        </a>
+                      </div>
+                    )}
+                    {company.email && (
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-gray-500" />
+                        <a href={`mailto:${company.email}`} className="text-blue-600 hover:text-blue-800 text-sm">
+                          {company.email}
+                        </a>
+                      </div>
+                    )}
+                    {company.phone && (
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">{company.phone}</span>
+                      </div>
                     )}
                   </div>
+                  <Separator />
                 </CardContent>
               </Card>
 
@@ -291,24 +236,12 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Industry:</span>
-                    <span className="font-medium">{company.industry}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Company Size:</span>
-                    <span className="font-medium">{company.size}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Founded:</span>
-                    <span className="font-medium">{company.founded}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Location:</span>
                     <span className="font-medium">{company.location}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Open Positions:</span>
-                    <span className="font-medium text-green-600">{company.jobCount}</span>
+                    <span className="font-medium text-green-600">{companyJobs.length}</span>
                   </div>
                 </CardContent>
               </Card>

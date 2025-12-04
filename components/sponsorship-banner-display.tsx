@@ -1,17 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getBannersByPosition } from "@/lib/banner-management-data"
-import type { SponsorshipBanner } from "@/lib/banner-management-types"
+import { useBanners } from "@/lib/banner-management-data"
+import type { Banner } from "@/lib/banner-management-data"
 import { ExternalLink } from "lucide-react"
 
 interface SponsorshipBannerDisplayProps {
-  position: "left" | "right" | "top" | "bottom" | "inline"
+  position: string
   className?: string
 }
 
 export function SponsorshipBannerDisplay({ position, className = "" }: SponsorshipBannerDisplayProps) {
-  const [banners, setBanners] = useState<SponsorshipBanner[]>([])
+  const { banners, isLoading, error } = useBanners()
+  const [filteredBanners, setFilteredBanners] = useState<Banner[]>([])
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
 
   const getPositionStyles = () => {
@@ -29,35 +30,39 @@ export function SponsorshipBannerDisplay({ position, className = "" }: Sponsorsh
     }
   }
 
-  const currentBanner = banners[currentBannerIndex]
+  const currentBanner = filteredBanners[currentBannerIndex]
 
-  const handleBannerClick = (banner: SponsorshipBanner) => {
+  const handleBannerClick = (banner: Banner) => {
     // Track click
     console.log("Banner clicked:", banner.id)
 
     // Open target URL
-    window.open(banner.targetUrl, "_blank", "noopener,noreferrer")
+    if (banner.targetUrl) {
+      window.open(banner.targetUrl, "_blank", "noopener,noreferrer")
+    }
   }
 
-  const trackImpression = (banner: SponsorshipBanner) => {
+  const trackImpression = (banner: Banner) => {
     // Track impression
     console.log("Banner impression:", banner.id)
   }
 
   useEffect(() => {
-    const activeBanners = getBannersByPosition(position)
-    setBanners(activeBanners)
-  }, [position])
+    const activeBanners = banners.filter(
+      (banner) => banner.position === position && banner.isActive
+    )
+    setFilteredBanners(activeBanners)
+  }, [banners, position])
 
   useEffect(() => {
-    if (banners.length > 1) {
+    if (filteredBanners.length > 1) {
       const interval = setInterval(() => {
-        setCurrentBannerIndex((prev) => (prev + 1) % banners.length)
+        setCurrentBannerIndex((prev) => (prev + 1) % filteredBanners.length)
       }, 10000) // Rotate every 10 seconds
 
       return () => clearInterval(interval)
     }
-  }, [banners.length])
+  }, [filteredBanners.length])
 
   // Track impression when banner is displayed
   useEffect(() => {
@@ -66,7 +71,10 @@ export function SponsorshipBannerDisplay({ position, className = "" }: Sponsorsh
     }
   }, [currentBanner])
 
-  if (banners.length === 0) {
+  if (isLoading) return <div>Loading banners...</div>
+  if (error) return <div>Error loading banners: {error.message}</div>
+
+  if (filteredBanners.length === 0) {
     return null
   }
 
@@ -98,9 +106,9 @@ export function SponsorshipBannerDisplay({ position, className = "" }: Sponsorsh
         </div>
 
         {/* Banner Rotation Indicator */}
-        {banners.length > 1 && (
+        {filteredBanners.length > 1 && (
           <div className="absolute bottom-2 left-2 flex gap-1">
-            {banners.map((_, index) => (
+            {filteredBanners.map((_, index) => (
               <div
                 key={index}
                 className={`w-2 h-2 rounded-full transition-colors ${

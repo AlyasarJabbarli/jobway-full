@@ -1,199 +1,102 @@
-export const allJobs = [
-  {
-    id: "1",
-    title: "Senior Frontend Developer",
-    company: "TechCorp Inc.",
-    companyId: "techcorp-inc",
-    location: "San Francisco",
-    description:
-      "Join our team to build cutting-edge web applications using React and Next.js. We're looking for someone with 5+ years of experience in modern frontend development.",
-    type: "Premium" as const,
-    category: "Engineering",
-    postedDate: "2 days ago",
-    salary: { min: 120000, max: 180000 },
-    experience: "Senior",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "2",
-    title: "Product Marketing Manager",
-    company: "StartupXYZ",
-    companyId: "startupxyz",
-    location: "Remote",
-    description:
-      "Lead our product marketing efforts and drive growth through strategic campaigns. Experience with B2B SaaS preferred. Strong analytical skills required.",
-    type: "Premium" as const,
-    category: "Marketing",
-    postedDate: "1 day ago",
-    salary: { min: 90000, max: 140000 },
-    experience: "Mid-level",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "3",
-    title: "UX/UI Designer",
-    company: "DesignStudio",
-    companyId: "designstudio",
-    location: "New York",
-    description:
-      "Create beautiful and intuitive user experiences for our digital products. Portfolio required. Experience with Figma and design systems preferred.",
-    type: "Premium" as const,
-    category: "Design",
-    postedDate: "3 days ago",
-    salary: { min: 85000, max: 130000 },
-    experience: "Mid-level",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "4",
-    title: "Backend Developer",
-    company: "DataFlow Systems",
-    companyId: "dataflow-systems",
-    location: "Berlin",
-    description:
-      "Build scalable backend systems using Node.js and Python. Experience with cloud platforms required. Knowledge of microservices architecture preferred.",
-    type: "Simple" as const,
-    category: "Engineering",
-    postedDate: "1 week ago",
-    salary: { min: 70000, max: 110000 },
-    experience: "Mid-level",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "5",
-    title: "Sales Representative",
-    company: "SalesForce Pro",
-    companyId: "salesforce-pro",
-    location: "London",
-    description:
-      "Drive revenue growth through strategic sales initiatives. B2B sales experience preferred. Strong communication and negotiation skills required.",
-    type: "Simple" as const,
-    category: "Sales",
-    postedDate: "5 days ago",
-    salary: { min: 50000, max: 80000 },
-    experience: "Entry-level",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "6",
-    title: "HR Specialist",
-    company: "People First",
-    companyId: "people-first",
-    location: "Remote",
-    description:
-      "Manage recruitment processes and employee relations. SHRM certification a plus. Experience with HRIS systems preferred.",
-    type: "Simple" as const,
-    category: "HR",
-    postedDate: "1 week ago",
-    salary: { min: 55000, max: 75000 },
-    experience: "Mid-level",
-    industry: "Consulting",
-    datePosted: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "7",
-    title: "DevOps Engineer",
-    company: "CloudTech Solutions",
-    companyId: "cloudtech-solutions",
-    location: "San Francisco",
-    description:
-      "Manage cloud infrastructure and CI/CD pipelines. AWS/Azure experience required. Knowledge of Kubernetes and Docker essential.",
-    type: "Premium" as const,
-    category: "Engineering",
-    postedDate: "4 days ago",
-    salary: { min: 130000, max: 190000 },
-    experience: "Senior",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "8",
-    title: "Content Marketing Specialist",
-    company: "ContentCorp",
-    companyId: "contentcorp",
-    location: "Remote",
-    description:
-      "Create engaging content across multiple channels. SEO knowledge preferred. Experience with content management systems required.",
-    type: "Simple" as const,
-    category: "Marketing",
-    postedDate: "6 days ago",
-    salary: { min: 45000, max: 65000 },
-    experience: "Entry-level",
-    industry: "Marketing",
-    datePosted: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "9",
-    title: "Data Scientist",
-    company: "Analytics Pro",
-    companyId: "analytics-pro",
-    location: "Boston",
-    description:
-      "Analyze complex datasets and build predictive models. Python and R experience required. PhD in related field preferred.",
-    type: "Premium" as const,
-    category: "Engineering",
-    postedDate: "1 day ago",
-    salary: { min: 110000, max: 160000 },
-    experience: "Senior",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "10",
-    title: "Customer Success Manager",
-    company: "SaaS Solutions",
-    companyId: "saas-solutions",
-    location: "Remote",
-    description:
-      "Ensure customer satisfaction and drive retention. SaaS experience preferred. Strong interpersonal skills required.",
-    type: "Simple" as const,
-    category: "Sales",
-    postedDate: "3 days ago",
-    salary: { min: 60000, max: 90000 },
-    experience: "Mid-level",
-    industry: "Technology",
-    datePosted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "11",
-    title: "Financial Analyst",
-    company: "Finance Corp",
-    companyId: "finance-corp",
-    location: "New York",
-    description:
-      "Analyze financial data and create reports for executive team. CFA preferred. Strong Excel and SQL skills required.",
-    type: "Premium" as const,
-    category: "Finance",
-    postedDate: "2 days ago",
-    salary: { min: 80000, max: 120000 },
-    experience: "Mid-level",
-    industry: "Finance",
-    datePosted: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "12",
-    title: "Registered Nurse",
-    company: "City Hospital",
-    companyId: "city-hospital",
-    location: "Boston",
-    description:
-      "Provide patient care in fast-paced hospital environment. RN license required. ICU experience preferred.",
-    type: "Simple" as const,
-    category: "Healthcare",
-    postedDate: "1 day ago",
-    salary: { min: 65000, max: 85000 },
-    experience: "Entry-level",
-    industry: "Healthcare",
-    datePosted: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-]
+import { apiClient } from './api-client';
 
-// Helper function to get jobs by company ID
-export function getJobsByCompanyId(companyId: string) {
-  return allJobs.filter((job) => job.companyId === companyId)
+export interface Job {
+  id: string
+  title: string
+  company: string
+  location: string
+  category: string
+  type: "Simple" | "Premium"
+  is_premium: boolean
+  salary: {
+    min: number
+    max: number
+  }
+  experience: string
+  industry?: string
+  /**
+   * Date the job was created (or published). Stored as a Date object so we can easily
+   * perform calculations such as "posted in the last 7 days" in the filters.
+   */
+  datePosted: Date
+  description: string
+  requirements?: string[]
+  benefits?: string[]
+  companyLogo?: string
+  /**
+   * Optional company id (useful when we need to deep-link to the company page).
+   */
+  companyId?: string
+  /**
+   * Employment type (e.g., "Full-time", "Part-time", etc.)
+   */
+  employmentType?: string
+  /**
+   * Team size (e.g., "10-50 employees")
+   */
+  teamSize?: string
+  /**
+   * Key responsibilities for the role
+   */
+  responsibilities?: string[]
 }
+
+// Function to fetch jobs from the API
+export async function fetchJobs(): Promise<Job[]> {
+  try {
+    const rawJobs = await apiClient.getJobs();
+
+    // Convert raw API response into the shape expected by the front-end
+    return rawJobs.map((job: any) => {
+      // Some API fields are returned in snake_case or with different naming
+      // conventions. We normalise them here so the UI can stay consistent.
+
+      const companyName = typeof job.company === "string" ? job.company : job.company?.name ?? "Unknown Company";
+
+      return {
+        id: job.id,
+        title: job.title,
+        company: companyName,
+        companyId: typeof job.company === "object" ? job.company.id : undefined,
+        location: job.location,
+        category: job.category,
+        // Older data might already have a "type" field, otherwise derive from is_premium
+        type: job.type ?? (job.is_premium ? "Premium" : "Simple"),
+        is_premium: job.is_premium || false,
+        salary: {
+          min: job.salary?.min ?? job.salary_min,
+          max: job.salary?.max ?? job.salary_max,
+        },
+        experience: job.experience,
+        industry: job.industry ?? "",
+        // Use createdAt when datePosted is missing
+        datePosted: new Date(job.datePosted ?? job.createdAt),
+        description: job.description,
+        requirements: Array.isArray(job.requirements)
+          ? job.requirements
+          : job.requirements
+            ? JSON.parse(job.requirements as string)
+            : [],
+        benefits: Array.isArray(job.benefits)
+          ? job.benefits
+          : job.benefits
+            ? JSON.parse(job.benefits as string)
+            : [],
+        companyLogo: job.company?.logoUrl ?? undefined,
+        employmentType: job.employmentType,
+        teamSize: job.teamSize,
+        responsibilities: Array.isArray(job.responsibilities)
+          ? job.responsibilities
+          : job.responsibilities
+            ? JSON.parse(job.responsibilities as string)
+            : [],
+      } satisfies Job;
+    });
+  } catch (error) {
+    console.error('Error fetching jobs:', error);
+    return [];
+  }
+}
+
+// For backward compatibility and initial state
+export const allJobs: Job[] = []; 

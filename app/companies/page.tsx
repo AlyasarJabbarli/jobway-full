@@ -1,84 +1,71 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Navigation } from "@/components/navigation"
 import { CompanyCard } from "@/components/company-card"
 import { CompanySearchFilters } from "@/components/company-search-filters"
 import { Footer } from "@/components/footer"
 import { ResponsiveBannerContainer } from "@/components/responsive-banner-container"
 import { ContentAwareLayout } from "@/components/content-aware-layout"
-import { companiesData } from "@/lib/companies-data"
 import { Building2, TrendingUp } from "lucide-react"
+import type { Company } from "@/lib/companies-data"
 
 export default function CompaniesPage() {
+  const [companiesData, setCompaniesData] = useState<Company[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await fetch('/api/companies')
+        const data = await response.json()
+        setCompaniesData(data)
+      } catch (error) {
+        console.error('Error fetching companies:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchCompanies()
+  }, [])
+
   const [filters, setFilters] = useState({
     search: "",
-    industry: "all",
     size: "all",
     location: "all",
   })
 
   const filteredCompanies = useMemo(() => {
     return companiesData.filter((company) => {
-      // Search filter
-      const searchMatch =
+      const matchesSearch =
         !filters.search ||
         company.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        company.description.toLowerCase().includes(filters.search.toLowerCase()) ||
-        company.industry.toLowerCase().includes(filters.search.toLowerCase())
-
-      // Industry filter
-      const industryMatch = filters.industry === "all" || company.industry === filters.industry
-
-      // Size filter
-      let sizeMatch = true
-      if (filters.size !== "all") {
-        const companySize = company.size.toLowerCase()
-        switch (filters.size) {
-          case "1-25":
-            sizeMatch = companySize.includes("25") && !companySize.includes("50")
-            break
-          case "25-100":
-            sizeMatch = companySize.includes("25-") || companySize.includes("50-100")
-            break
-          case "100-500":
-            sizeMatch = companySize.includes("100-") || companySize.includes("150-") || companySize.includes("200-")
-            break
-          case "500+":
-            sizeMatch = companySize.includes("500")
-            break
-        }
-      }
-
-      // Location filter
-      const locationMatch =
-        filters.location === "all" || company.location.toLowerCase().includes(filters.location.toLowerCase())
-
-      return searchMatch && industryMatch && sizeMatch && locationMatch
+        (company.description && company.description.toLowerCase().includes(filters.search.toLowerCase()));
+      const matchesSize = filters.size === "all" || company.size === filters.size;
+      const matchesLocation = filters.location === "all" || company.location === filters.location;
+      return matchesSearch && matchesSize && matchesLocation;
     })
-  }, [filters])
+  }, [filters, companiesData])
 
   const updateFilter = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   const clearFilters = () => {
-    setFilters({
-      search: "",
-      industry: "all",
-      size: "all",
-      location: "all",
-    })
+    setFilters({ search: "", size: "all", location: "all" })
   }
 
   // Get industry stats
   const industryStats = useMemo(() => {
-    const stats: Record<string, number> = {}
+    const uniqueIndustries = new Set<string>();
     companiesData.forEach((company) => {
-      stats[company.industry] = (stats[company.industry] || 0) + 1
-    })
-    return Object.entries(stats).sort((a, b) => b[1] - a[1])
-  }, [])
+      if (company.industry && company.industry !== "Unknown") {
+        uniqueIndustries.add(company.industry);
+      }
+    });
+    return Array.from(uniqueIndustries);
+  }, [companiesData])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -95,41 +82,53 @@ export default function CompaniesPage() {
               <Building2 className="h-8 w-8 text-blue-600" />
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Companies</h1>
             </div>
-            <p className="text-gray-600 mb-6">
-              Discover {companiesData.length} innovative companies hiring on our platform. Explore their culture,
-              benefits, and open positions.
-            </p>
+            {isLoading ? (
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-6"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-gray-200 p-4 rounded-lg h-20"></div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-600 mb-6">
+                  Discover {companiesData.length} innovative companies hiring on our platform. Explore their culture,
+                  benefits, and open positions.
+                </p>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white p-4 rounded-lg border text-center">
-                <div className="text-2xl font-bold text-blue-600 mb-1">{companiesData.length}</div>
-                <div className="text-sm text-gray-600">Total Companies</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg border text-center">
-                <div className="text-2xl font-bold text-green-600 mb-1">
-                  {companiesData.reduce((sum, company) => sum + company.jobCount, 0)}
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-white p-4 rounded-lg border text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-1">{companiesData.length}</div>
+                    <div className="text-sm text-gray-600">Total Companies</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border text-center">
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      {companiesData.reduce((sum, company) => sum + (typeof company.openPositions === 'number' ? company.openPositions : (typeof (company as any).jobCount === 'number' ? (company as any).jobCount : 0)), 0)}
+                    </div>
+                    <div className="text-sm text-gray-600">Open Positions</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border text-center">
+                    <div className="text-2xl font-bold text-purple-600 mb-1">{industryStats.length}</div>
+                    <div className="text-sm text-gray-600">Industries</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border text-center">
+                    <div className="text-2xl font-bold text-orange-600 mb-1">
+                      {companiesData.filter((c) => typeof c.location === 'string' && c.location.toLowerCase().includes('remote')).length}
+                    </div>
+                    <div className="text-sm text-gray-600">Remote-First</div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600">Open Positions</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg border text-center">
-                <div className="text-2xl font-bold text-purple-600 mb-1">{industryStats.length}</div>
-                <div className="text-sm text-gray-600">Industries</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg border text-center">
-                <div className="text-2xl font-bold text-orange-600 mb-1">
-                  {companiesData.filter((c) => c.location === "Remote").length}
-                </div>
-                <div className="text-sm text-gray-600">Remote-First</div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Search and Filters */}
           <div className="mb-8">
             <CompanySearchFilters
               onSearchChange={(value) => updateFilter("search", value)}
-              onIndustryChange={(value) => updateFilter("industry", value)}
               onSizeChange={(value) => updateFilter("size", value)}
               onLocationChange={(value) => updateFilter("location", value)}
               onClearFilters={clearFilters}
@@ -138,30 +137,45 @@ export default function CompaniesPage() {
           </div>
 
           {/* Results Summary */}
-          <div className="mb-6 flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Showing {filteredCompanies.length} of {companiesData.length} companies
-              {Object.values(filters).some((filter) => filter !== "all" && filter !== "") && " (filtered)"}
-            </p>
-            {filteredCompanies.length > 0 && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <TrendingUp className="h-4 w-4" />
-                <span>
-                  {filteredCompanies.reduce((sum, company) => sum + company.jobCount, 0)} total jobs available
-                </span>
-              </div>
-            )}
-          </div>
+          {!isLoading && (
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Showing {filteredCompanies.length} of {companiesData.length} companies
+                {Object.values(filters).some((filter) => filter !== "all" && filter !== "") && " (filtered)"}
+              </p>
+              {filteredCompanies.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <TrendingUp className="h-4 w-4" />
+                  <span>
+                    {filteredCompanies.reduce((sum, company) => sum + company.openPositions, 0)} total jobs available
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Companies Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredCompanies.map((company) => (
-              <CompanyCard key={company.id} company={company} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white p-6 rounded-lg border animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-full mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredCompanies.map((company) => (
+                <CompanyCard key={company.id} company={company} />
+              ))}
+            </div>
+          )}
 
           {/* No Results */}
-          {filteredCompanies.length === 0 && (
+          {!isLoading && filteredCompanies.length === 0 && (
             <div className="text-center py-12">
               <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No companies found</h3>
@@ -172,20 +186,7 @@ export default function CompaniesPage() {
             </div>
           )}
 
-          {/* Industry Breakdown */}
-          {filteredCompanies.length > 0 && (
-            <div className="mt-12 bg-white p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4">Companies by Industry</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {industryStats.map(([industry, count]) => (
-                  <div key={industry} className="text-center p-3 bg-gray-50 rounded-lg">
-                    <div className="text-lg font-semibold text-gray-900">{count}</div>
-                    <div className="text-sm text-gray-600">{industry}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+       
         </div>
       </ContentAwareLayout>
 

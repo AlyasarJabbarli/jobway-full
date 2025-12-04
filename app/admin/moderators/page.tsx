@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AdminLayout } from "@/components/admin/admin-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,16 +8,49 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { moderatorsData, getModeratorStats, currentUser } from "@/lib/admin-data"
+import { useModeratorsData, getModeratorStats, useCurrentUser } from "@/lib/admin-data"
 import { Plus, Search, Edit, UserCheck, UserX, Calendar, Briefcase, Building2 } from "lucide-react"
 import Link from "next/link"
+import { apiClient } from "@/lib/api-client"
 
 export default function ModeratorsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const currentUser = useCurrentUser();
+  const moderators = useModeratorsData();
+  const [statsMap, setStatsMap] = useState<Record<string, any>>({});
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [errorStats, setErrorStats] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<{ [id: string]: boolean }>({});
+
+  // Fetch stats for all moderators when list changes
+  useEffect(() => {
+    if (!moderators.length) return;
+    setLoadingStats(true);
+    setErrorStats(null);
+    Promise.all(
+      moderators.map(async (mod) => {
+        try {
+          const stats = await getModeratorStats(mod.id);
+          return { id: mod.id, stats };
+        } catch (err) {
+          return { id: mod.id, stats: null };
+        }
+      })
+    )
+      .then((results) => {
+        const map: Record<string, any> = {};
+        results.forEach(({ id, stats }) => {
+          map[id] = stats;
+        });
+        setStatsMap(map);
+      })
+      .catch((err) => setErrorStats("Failed to load moderator stats"))
+      .finally(() => setLoadingStats(false));
+  }, [moderators]);
 
   // Redirect if not admin
-  if (currentUser.role !== "admin") {
+  if (!currentUser || currentUser.role !== "admin") {
     return (
       <AdminLayout>
         <div className="text-center py-12">
@@ -28,7 +61,7 @@ export default function ModeratorsPage() {
     )
   }
 
-  const filteredModerators = moderatorsData.filter((moderator) => {
+  const filteredModerators = moderators.filter((moderator) => {
     const matchesSearch =
       moderator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       moderator.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -38,6 +71,16 @@ export default function ModeratorsPage() {
       (statusFilter === "inactive" && !moderator.isActive)
     return matchesSearch && matchesStatus
   })
+
+  if (!moderators.length) {
+    return (
+      <AdminLayout>
+        <div className="text-center py-12">
+          <p className="text-gray-600">Loading moderators...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -86,7 +129,23 @@ export default function ModeratorsPage() {
         {/* Moderators List */}
         <div className="grid gap-6">
           {filteredModerators.map((moderator) => {
-            const stats = getModeratorStats(moderator.id)
+            const stats = statsMap[moderator.id];
+            const handleToggleActive = async () => {
+              setUpdating((prev) => ({ ...prev, [moderator.id]: true }));
+              try {
+                await apiClient.updateModerator(moderator.id, {
+                  name: moderator.name,
+                  email: moderator.email,
+                  role: moderator.role,
+                  isActive: !moderator.isActive,
+                });
+                window.location.reload();
+              } catch (err) {
+                alert("Failed to update moderator status");
+              } finally {
+                setUpdating((prev) => ({ ...prev, [moderator.id]: false }));
+              }
+            };
             return (
               <Card key={moderator.id}>
                 <CardContent className="pt-6">
@@ -109,11 +168,11 @@ export default function ModeratorsPage() {
                         <div className="flex items-center gap-4 text-sm text-gray-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            Joined {moderator.createdAt.toLocaleDateString()}
+                            Joined {new Date(moderator.createdAt).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            Last login {moderator.lastLogin?.toLocaleDateString() || "Never"}
+                            Last login {moderator.lastLogin ? new Date(moderator.lastLogin).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "Never"}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -138,6 +197,8 @@ export default function ModeratorsPage() {
                         className={
                           moderator.isActive ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"
                         }
+                        onClick={handleToggleActive}
+                        disabled={!!updating[moderator.id]}
                       >
                         {moderator.isActive ? (
                           <>
@@ -156,27 +217,27 @@ export default function ModeratorsPage() {
 
                   {/* Performance Stats */}
                   {stats && (
-                    <div className="mt-6 pt-6 border-t">
+                    <div className="mt-6 pt-6 border-t text-gray-600">
                       <h4 className="font-medium mb-3">Performance Overview</h4>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <Briefcase className="h-4 w-4 text-blue-600" />
-                            <span className="text-lg font-semibold">{stats.totalJobsCreated}</span>
+                            <span className="text-lg font-semibold">{stats.totalJobsCreated ?? 0}</span>
                           </div>
                           <p className="text-xs text-gray-600">Total Jobs</p>
                         </div>
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <Briefcase className="h-4 w-4 text-yellow-600" />
-                            <span className="text-lg font-semibold">{stats.premiumJobsCreated}</span>
+                            <span className="text-lg font-semibold">{stats.premiumJobsCreated ?? 0}</span>
                           </div>
                           <p className="text-xs text-gray-600">Premium Jobs</p>
                         </div>
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <Building2 className="h-4 w-4 text-green-600" />
-                            <span className="text-lg font-semibold">{stats.companiesCreated}</span>
+                            <span className="text-lg font-semibold">{stats.companiesCreated ?? 0}</span>
                           </div>
                           <p className="text-xs text-gray-600">Companies</p>
                         </div>
@@ -184,7 +245,7 @@ export default function ModeratorsPage() {
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <Calendar className="h-4 w-4 text-purple-600" />
                             <span className="text-lg font-semibold">
-                              {stats.monthlyStats[stats.monthlyStats.length - 1]?.jobsCreated || 0}
+                              {stats.monthlyStats?.[stats.monthlyStats.length - 1]?.jobsCreated ?? 0}
                             </span>
                           </div>
                           <p className="text-xs text-gray-600">This Month</p>

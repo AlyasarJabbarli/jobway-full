@@ -4,12 +4,64 @@ import { AdminLayout } from "@/components/admin/admin-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { platformAnalytics, moderatorsData, getModeratorStats, currentUser } from "@/lib/admin-data"
 import { BarChart3, TrendingUp, Users, Briefcase, Building2, Award, Target } from "lucide-react"
+import { useCurrentUser, usePlatformAnalytics, useModeratorsData, getModeratorStats, ModeratorStats, PlatformAnalytics } from "../../../lib/admin-data"
+import { useEffect, useState } from "react"
+import { apiClient } from "@/lib/api-client"
+
+interface MonthlyGrowth {
+  month: string
+  jobs: number
+  companies: number
+}
+
+interface TopPerformingModerator {
+  id: string
+  name: string
+  jobsCreated: number
+}
 
 export default function AnalyticsPage() {
+  const currentUser = useCurrentUser()
+  const platformAnalytics = usePlatformAnalytics()
+  const moderatorsData = useModeratorsData()
+  const [moderatorStats, setModeratorStats] = useState<Record<string, ModeratorStats>>({})
+  const [companiesWithJobs, setCompaniesWithJobs] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchModeratorStats = async () => {
+      const stats: Record<string, ModeratorStats> = {}
+      for (const moderator of platformAnalytics.topPerformingModerators) {
+        try {
+          stats[moderator.id] = await getModeratorStats(moderator.id)
+        } catch (error) {
+          console.error(`Failed to fetch stats for moderator ${moderator.id}:`, error)
+        }
+      }
+      setModeratorStats(stats)
+    }
+
+    if (platformAnalytics.topPerformingModerators.length > 0) {
+      fetchModeratorStats()
+    }
+  }, [platformAnalytics.topPerformingModerators])
+
+  useEffect(() => {
+    // Fetch jobs and calculate companies with jobs
+    async function fetchCompaniesWithJobs() {
+      try {
+        const jobs = await apiClient.getJobs()
+        const companyIds = new Set(jobs.map((job: any) => job.companyId).filter(Boolean))
+        setCompaniesWithJobs(companyIds.size)
+      } catch (error) {
+        setCompaniesWithJobs(null)
+      }
+    }
+    fetchCompaniesWithJobs()
+  }, [])
+
   // Redirect if not admin
-  if (currentUser.role !== "admin") {
+  if (!currentUser || currentUser.role !== "admin") {
     return (
       <AdminLayout>
         <div className="text-center py-12">
@@ -66,7 +118,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="text-2xl font-bold">{platformAnalytics.totalCompanies}</div>
               <p className="text-xs text-muted-foreground">
-                Across {Object.keys(platformAnalytics.companiesByIndustry).length} industries
+                {companiesWithJobs !== null ? `${companiesWithJobs} companies with jobs` : "Loading..."}
               </p>
             </CardContent>
           </Card>
@@ -79,7 +131,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="text-2xl font-bold">{platformAnalytics.totalModerators}</div>
               <p className="text-xs text-muted-foreground">
-                {moderatorsData.filter((m) => m.isActive).length} active moderators
+                {moderatorsData.filter((m: { isActive: boolean }) => m.isActive).length} active moderators
               </p>
             </CardContent>
           </Card>
@@ -97,7 +149,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="space-y-3">
                 {Object.entries(platformAnalytics.jobsByCategory)
-                  .sort(([, a], [, b]) => b - a)
+                  .sort(([, a], [, b]) => (b as number) - (a as number))
                   .map(([category, count]) => (
                     <div key={category} className="flex items-center justify-between">
                       <span className="text-sm font-medium">{category}</span>
@@ -106,11 +158,11 @@ export default function AnalyticsPage() {
                           <div
                             className="bg-blue-600 h-2 rounded-full"
                             style={{
-                              width: `${(count / Math.max(...Object.values(platformAnalytics.jobsByCategory))) * 100}%`,
+                              width: `${((count as number) / Math.max(...Object.values(platformAnalytics.jobsByCategory).map(v => v as number))) * 100}%`,
                             }}
                           />
                         </div>
-                        <span className="text-sm text-gray-600 w-8 text-right">{count}</span>
+                        <span className="text-sm text-gray-600 w-8 text-right">{String(count)}</span>
                       </div>
                     </div>
                   ))}
@@ -129,7 +181,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="space-y-3">
                 {Object.entries(platformAnalytics.jobsByLocation)
-                  .sort(([, a], [, b]) => b - a)
+                  .sort(([, a], [, b]) => (b as number) - (a as number))
                   .map(([location, count]) => (
                     <div key={location} className="flex items-center justify-between">
                       <span className="text-sm font-medium">{location}</span>
@@ -138,11 +190,11 @@ export default function AnalyticsPage() {
                           <div
                             className="bg-green-600 h-2 rounded-full"
                             style={{
-                              width: `${(count / Math.max(...Object.values(platformAnalytics.jobsByLocation))) * 100}%`,
+                              width: `${((count as number) / Math.max(...Object.values(platformAnalytics.jobsByLocation).map(v => v as number))) * 100}%`,
                             }}
                           />
                         </div>
-                        <span className="text-sm text-gray-600 w-8 text-right">{count}</span>
+                        <span className="text-sm text-gray-600 w-8 text-right">{String(count)}</span>
                       </div>
                     </div>
                   ))}
@@ -161,7 +213,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              {platformAnalytics.monthlyGrowth.map((month) => (
+              {platformAnalytics.monthlyGrowth.map((month: MonthlyGrowth) => (
                 <div key={month.month} className="text-center p-4 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-600 mb-1">{month.month}</div>
                   <div className="text-lg font-semibold text-blue-600">{month.jobs} jobs</div>
@@ -182,63 +234,45 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {platformAnalytics.topPerformingModerators.map((moderator, index) => {
-                const moderatorData = moderatorsData.find((m) => m.id === moderator.id)
-                const stats = getModeratorStats(moderator.id)
-                return (
-                  <div key={moderator.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold">
-                      {index + 1}
-                    </div>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={moderatorData?.avatar || "/placeholder.svg"} />
-                      <AvatarFallback>
-                        {moderator.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h4 className="font-semibold">{moderator.name}</h4>
-                      <p className="text-sm text-gray-600">{moderatorData?.email}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-blue-600">{moderator.jobsCreated}</div>
-                      <div className="text-sm text-gray-500">jobs created</div>
-                    </div>
-                    {stats && (
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-green-600">{stats.companiesCreated}</div>
-                        <div className="text-sm text-gray-500">companies</div>
+              {platformAnalytics.topPerformingModerators
+                .filter((moderator: TopPerformingModerator) => moderatorsData.some((m: { id: string }) => m.id === moderator.id))
+                .map((moderator: TopPerformingModerator, index: number) => {
+                  const moderatorData = moderatorsData.find((m: { id: string }) => m.id === moderator.id)
+                  const stats = moderatorStats[moderator.id]
+                  return (
+                    <div key={moderator.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold">
+                        {index + 1}
                       </div>
-                    )}
-                    <Badge variant={moderatorData?.isActive ? "default" : "secondary"}>
-                      {moderatorData?.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Companies by Industry */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Companies by Industry
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {Object.entries(platformAnalytics.companiesByIndustry).map(([industry, count]) => (
-                <div key={industry} className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600 mb-1">{count}</div>
-                  <div className="text-sm text-gray-600">{industry}</div>
-                </div>
-              ))}
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={moderatorData?.avatar || "/user_placeholder.svg"} />
+                        <AvatarFallback>
+                          {moderator.name
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-black">{moderator.name}</h4>
+                        <p className="text-sm text-gray-600">{moderatorData?.email}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-semibold text-blue-600">{moderator.jobsCreated}</div>
+                        <div className="text-sm text-gray-500">jobs created</div>
+                      </div>
+                      {stats && (
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-green-600">{stats.companiesCreated}</div>
+                          <div className="text-sm text-gray-500">companies</div>
+                        </div>
+                      )}
+                      <Badge variant={moderatorData?.isActive ? "default" : "secondary"}>
+                        {moderatorData?.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  )
+                })}
             </div>
           </CardContent>
         </Card>

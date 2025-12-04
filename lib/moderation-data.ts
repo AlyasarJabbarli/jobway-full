@@ -1,234 +1,276 @@
-import type {
-  ModerationReport,
-  ContentFlag,
-  ModerationActivity,
-  ModerationStats,
-  ModeratorUser,
-} from "./moderation-types"
+import { db } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-// Mock current moderator user
-export const currentModerator: ModeratorUser = {
-  id: "mod-1",
-  email: "sarah.moderator@jobportal.com",
-  name: "Sarah Johnson",
-  role: "moderator",
-  avatar: "/placeholder.svg?height=40&width=40",
-  createdAt: new Date("2023-02-15"),
-  lastLogin: new Date(),
-  isActive: true,
-  permissions: [
-    {
-      id: "mod-jobs",
-      name: "Job Management",
-      description: "Full access to job postings",
-      resource: "jobs",
-      actions: ["create", "read", "update", "delete", "moderate"],
+interface SessionUser {
+  id: string;
+  role: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: "job_review" | "company_review" | "user_report";
+  status: "approved" | "rejected" | "pending";
+  title: string;
+  timestamp: string;
+  details: string;
+}
+
+export async function getCurrentModerator() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = session.user as SessionUser;
+  if (!user.id) {
+    throw new Error("User ID not found");
+  }
+
+  const moderator = await db.user.findUnique({
+    where: { id: user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      isActive: true,
     },
-    {
-      id: "mod-companies",
-      name: "Company Management",
-      description: "Full access to company profiles",
-      resource: "companies",
-      actions: ["create", "read", "update", "delete", "moderate"],
+  });
+
+  if (!moderator) {
+    throw new Error("Moderator not found");
+  }
+
+  return moderator;
+}
+
+export async function getModerationStats() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = session.user as SessionUser;
+  if (!user.id) {
+    throw new Error("User ID not found");
+  }
+
+  // Get total jobs reviewed by this moderator
+  const totalReviewed = await db.job.count({
+    where: { createdById: user.id },
+  });
+
+  // Get pending jobs (jobs created in the last 24 hours)
+  const pendingReviews = await db.job.count({
+    where: {
+      createdAt: {
+        gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
     },
-    {
-      id: "mod-reports",
-      name: "Report Management",
-      description: "Handle user reports and complaints",
-      resource: "reports",
-      actions: ["read", "update", "moderate"],
+  });
+
+  // Get total jobs managed by this moderator
+  const totalJobs = await db.job.count({
+    where: { createdById: user.id },
+  });
+
+  // Get total companies managed by this moderator
+  const totalCompanies = await db.company.count({
+    where: { createdById: user.id },
+  });
+
+  // Get monthly activity for the last 6 months
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const monthlyActivity = await db.job.groupBy({
+    by: ['createdAt'],
+    where: {
+      createdById: user.id,
+      createdAt: {
+        gte: sixMonthsAgo,
+      },
     },
-    {
-      id: "mod-flags",
-      name: "Content Flags",
-      description: "Manage content flags and reviews",
-      resource: "flags",
-      actions: ["create", "read", "update", "moderate"],
+    _count: true,
+  });
+
+  // Format monthly activity data
+  const formattedMonthlyActivity = monthlyActivity.map(activity => ({
+    month: activity.createdAt.toLocaleString('default', { month: 'short' }),
+    reviews: activity._count,
+  }));
+
+  return {
+    totalReviewed,
+    pendingReviews,
+    totalJobs,
+    totalCompanies,
+    averageResponseTime: "2.5 hours", // This would need to be calculated based on actual data
+    accuracy: 98.5, // This would need to be calculated based on actual data
+    monthlyActivity: formattedMonthlyActivity,
+  };
+}
+
+export async function getRecentActivity(): Promise<ActivityItem[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = session.user as SessionUser;
+  if (!user.id) {
+    throw new Error("User ID not found");
+  }
+
+  // Get recent jobs
+  const recentJobs = await db.job.findMany({
+    where: {
+      createdById: user.id,
     },
-  ],
-  stats: {
-    totalReportsResolved: 127,
-    totalContentModerated: 89,
-    averageResolutionTime: 2.4,
-    accuracyScore: 94.2,
-  },
-}
-
-// Mock moderation reports
-export const moderationReports: ModerationReport[] = [
-  {
-    id: "report-1",
-    type: "job",
-    targetId: "job-1",
-    targetTitle: "Senior Frontend Developer",
-    reportedBy: "John Doe",
-    reporterEmail: "john@example.com",
-    reason: "fake",
-    description: "This job posting seems fake. The company doesn't exist and the salary is unrealistic.",
-    status: "pending",
-    priority: "high",
-    assignedTo: "mod-1",
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    evidence: ["screenshot1.png", "email_thread.pdf"],
-  },
-  {
-    id: "report-2",
-    type: "company",
-    targetId: "company-1",
-    targetTitle: "TechCorp Inc.",
-    reportedBy: "Jane Smith",
-    reporterEmail: "jane@example.com",
-    reason: "inappropriate",
-    description: "Company profile contains inappropriate content and misleading information.",
-    status: "reviewing",
-    priority: "medium",
-    assignedTo: "mod-1",
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-  },
-  {
-    id: "report-3",
-    type: "job",
-    targetId: "job-2",
-    targetTitle: "Marketing Manager",
-    reportedBy: "Bob Wilson",
-    reporterEmail: "bob@example.com",
-    reason: "outdated",
-    description: "This job has been filled but is still showing as active.",
-    status: "resolved",
-    priority: "low",
-    assignedTo: "mod-1",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    resolvedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    resolution: "Job posting updated and marked as filled.",
-  },
-]
-
-// Mock content flags
-export const contentFlags: ContentFlag[] = [
-  {
-    id: "flag-1",
-    contentType: "job",
-    contentId: "job-3",
-    contentTitle: "Data Scientist Position",
-    flagType: "expired",
-    reason: "Job posting is over 60 days old",
-    flaggedBy: "system",
-    flaggedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
-    status: "active",
-  },
-  {
-    id: "flag-2",
-    contentType: "company",
-    contentId: "company-2",
-    contentTitle: "StartupXYZ",
-    flagType: "needs_update",
-    reason: "Company information appears outdated",
-    flaggedBy: "mod-1",
-    flaggedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    status: "active",
-    notes: "Website URL returns 404, contact information may be invalid",
-  },
-  {
-    id: "flag-3",
-    contentType: "job",
-    contentId: "job-4",
-    contentTitle: "Remote Developer",
-    flagType: "suspicious",
-    reason: "Unusually high salary for entry level position",
-    flaggedBy: "mod-1",
-    flaggedAt: new Date(Date.now() - 18 * 60 * 60 * 1000),
-    status: "resolved",
-    resolvedBy: "mod-1",
-    resolvedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
-    notes: "Verified with company, salary is accurate for specialized skills required",
-  },
-]
-
-// Mock moderation activity
-export const moderationActivity: ModerationActivity[] = [
-  {
-    id: "activity-1",
-    moderatorId: "mod-1",
-    moderatorName: "Sarah Johnson",
-    action: "resolved",
-    targetType: "report",
-    targetId: "report-3",
-    targetTitle: "Marketing Manager Report",
-    timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    details: "Job posting updated and marked as filled",
-    reason: "Outdated job posting",
-  },
-  {
-    id: "activity-2",
-    moderatorId: "mod-1",
-    moderatorName: "Sarah Johnson",
-    action: "flagged",
-    targetType: "company",
-    targetId: "company-2",
-    targetTitle: "StartupXYZ",
-    timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    details: "Flagged for outdated information",
-  },
-  {
-    id: "activity-3",
-    moderatorId: "mod-1",
-    moderatorName: "Sarah Johnson",
-    action: "approved",
-    targetType: "job",
-    targetId: "job-5",
-    targetTitle: "UX Designer",
-    timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000),
-    details: "Job posting approved after review",
-  },
-]
-
-// Mock moderation stats
-export const moderationStats: ModerationStats = {
-  pendingReports: 2,
-  activeFlags: 2,
-  resolvedToday: 3,
-  totalResolved: 127,
-  averageResolutionTime: 2.4,
-  reportsByType: {
-    job: 8,
-    company: 3,
-    user: 2,
-    content: 1,
-  },
-  flagsByType: {
-    expired: 5,
-    needs_update: 3,
-    suspicious: 2,
-    pending_review: 4,
-  },
-  moderatorActivity: [
-    {
-      moderatorId: "mod-1",
-      moderatorName: "Sarah Johnson",
-      actionsToday: 5,
-      totalActions: 234,
+    orderBy: {
+      createdAt: 'desc',
     },
-  ],
+    take: 10,
+    include: {
+      company: true,
+    },
+  });
+
+  // Convert jobs to activity items
+  return recentJobs.map(job => ({
+    id: job.id,
+    type: "job_review",
+    status: "approved", // This would need to be determined based on actual data
+    title: job.title,
+    timestamp: job.createdAt.toISOString(),
+    details: `Job listing for ${job.company.name}`,
+  }));
 }
 
-// Helper functions
-export function hasModeratorPermission(moderator: ModeratorUser, resource: string, action: string): boolean {
-  return moderator.permissions.some(
-    (permission) => permission.resource === resource && permission.actions.includes(action as any),
-  )
+export async function getModerationActivity(): Promise<ActivityItem[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = session.user as SessionUser;
+  if (!user.id) {
+    throw new Error("User ID not found");
+  }
+
+  // Get all jobs created by this moderator
+  const jobs = await db.job.findMany({
+    where: {
+      createdById: user.id,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include: {
+      company: true,
+    },
+  });
+
+  // Convert jobs to activity items
+  return jobs.map(job => ({
+    id: job.id,
+    type: "job_review",
+    status: "approved", // This would need to be determined based on actual data
+    title: job.title,
+    timestamp: job.createdAt.toISOString(),
+    details: `Job listing for ${job.company.name}`,
+  }));
 }
 
-export function getReportsByStatus(status: string): ModerationReport[] {
-  return moderationReports.filter((report) => report.status === status)
+// Fetch all jobs created by the current moderator
+export async function getModeratorJobs() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = session.user as SessionUser;
+  if (!user.id) {
+    throw new Error("User ID not found");
+  }
+
+  const jobs = await db.job.findMany({
+    where: { createdById: user.id },
+    orderBy: { createdAt: 'desc' },
+    include: { company: true },
+  });
+
+  return jobs.map(job => ({
+    id: job.id,
+    title: job.title,
+    company: job.company?.name ?? '',
+    location: job.location ?? '',
+    type: job.type ?? (job.is_premium ? 'Premium' : 'Simple'),
+    createdAt: job.createdAt,
+  }));
 }
 
-export function getFlagsByStatus(status: string): ContentFlag[] {
-  return contentFlags.filter((flag) => flag.status === status)
+// Fetch all companies created by the current moderator
+export async function getModeratorCompanies() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = session.user as SessionUser;
+  if (!user.id) {
+    throw new Error("User ID not found");
+  }
+
+  const companies = await db.company.findMany({
+    where: { createdById: user.id },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return companies.map(company => ({
+    id: company.id,
+    name: company.name,
+    industry: '', // Add industry if available in your schema
+    location: company.location ?? '',
+    logoUrl: company.logoUrl ?? '',
+    description: company.description ?? '',
+    createdAt: company.createdAt,
+  }));
 }
 
-export function getRecentActivity(limit = 10): ModerationActivity[] {
-  return moderationActivity.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit)
-}
+// Fetch a job by its ID
+export async function getJobById(id: string) {
+  const job = await db.job.findUnique({
+    where: { id },
+    include: { company: true },
+  });
+  if (!job) return null;
+  return {
+    id: job.id,
+    title: job.title,
+    company: job.company?.name ?? '',
+    location: job.location ?? '',
+    type: job.type ?? (job.is_premium ? 'Premium' : 'Simple'),
+    description: job.description ?? '',
+    experience: job.experience ?? '',
+    salary_min: job.salary_min,
+    salary_max: job.salary_max,
+    companyId: job.companyId,
+    requirements: job.requirements ?? [],
+    benefits: job.benefits ?? [],
+    responsibilities: job.responsibilities ?? [],
+    employmentType: job.employmentType ?? '',
+    teamSize: job.teamSize ?? '',
+    datePosted: job.createdAt,
+    applicationEmail: job.applicationEmail ?? '',
+    applicationUrl: job.applicationUrl ?? '',
+    expiryDate: job.expiryDate ?? '',
+    category: job.category ?? '',
+    is_premium: job.is_premium ?? false,
+  };
+} 

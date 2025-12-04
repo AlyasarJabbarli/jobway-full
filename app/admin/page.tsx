@@ -5,17 +5,46 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { currentUser, moderatorsData, platformAnalytics } from "@/lib/admin-data"
 import { Briefcase, Building2, Users, TrendingUp, Activity, Clock, Plus, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import { useCurrentUser, usePlatformAnalytics, useModeratorsData } from "@/lib/admin-data"
+import { useEffect, useState } from "react"
+
+function useRecentActivity() {
+  const [activity, setActivity] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    fetch("/api/activity")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setActivity(data)
+        } else {
+          setActivity([]) // fallback if error or not array
+        }
+      })
+      .catch(() => setActivity([]))
+      .finally(() => setLoading(false))
+  }, [])
+  return { activity, loading }
+}
 
 export default function AdminDashboard() {
-  const recentActivity = [
-    { id: 1, action: "Job Created", item: "Senior Frontend Developer", user: "Sarah Johnson", time: "2 hours ago" },
-    { id: 2, action: "Company Added", item: "TechStartup Inc.", user: "Mike Chen", time: "4 hours ago" },
-    { id: 3, action: "Job Updated", item: "Product Manager", user: "Sarah Johnson", time: "6 hours ago" },
-    { id: 4, action: "Company Updated", item: "DataFlow Systems", user: "Emily Rodriguez", time: "1 day ago" },
-  ]
+  const currentUser = useCurrentUser()
+  const platformAnalytics = usePlatformAnalytics()
+  const moderatorsData = useModeratorsData()
+  const { activity: recentActivity, loading: loadingActivity } = useRecentActivity()
+
+  if (!currentUser) {
+    return (
+      <AdminLayout>
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <p className="text-gray-600">Please sign in to access the admin dashboard.</p>
+        </div>
+      </AdminLayout>
+    )
+  }
 
   return (
     <AdminLayout>
@@ -106,21 +135,27 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                    <div className="flex-1">
-                      <p className="text-sm">
-                        <span className="font-medium">{activity.action}:</span> {activity.item}
-                      </p>
-                      <p className="text-xs text-gray-500">by {activity.user}</p>
+                {loadingActivity ? (
+                  <div className="text-center text-gray-500">Loading activity...</div>
+                ) : recentActivity.length === 0 ? (
+                  <div className="text-center text-gray-500">No recent activity.</div>
+                ) : (
+                  recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                      <div className="flex-1">
+                        <p className="text-sm">
+                          <span className="font-medium">{activity.action}:</span> {activity.itemName}
+                        </p>
+                        <p className="text-xs text-gray-500">by {activity.userName}</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        {new Date(activity.createdAt).toLocaleString()}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      {activity.time}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               <Button variant="outline" className="w-full mt-4" asChild>
                 <Link href="/admin/activity">

@@ -16,7 +16,6 @@ interface AdvancedJobFiltersProps {
   onTypeChange: (type: string) => void
   onSalaryRangeChange: (min: string, max: string) => void
   onExperienceChange: (experience: string) => void
-  onIndustryChange: (industry: string) => void
   onDatePostedChange: (datePosted: string) => void
   onClearFilters: () => void
   activeFilters: {
@@ -26,7 +25,6 @@ interface AdvancedJobFiltersProps {
     salaryMin: string
     salaryMax: string
     experience: string
-    industry: string
     datePosted: string
   }
 }
@@ -37,32 +35,24 @@ export function AdvancedJobFilters({
   onTypeChange,
   onSalaryRangeChange,
   onExperienceChange,
-  onIndustryChange,
   onDatePostedChange,
   onClearFilters,
   activeFilters,
 }: AdvancedJobFiltersProps) {
-  const [salaryMin, setSalaryMin] = useState(activeFilters.salaryMin)
-  const [salaryMax, setSalaryMax] = useState(activeFilters.salaryMax)
-
-  const handleSalaryChange = () => {
-    onSalaryRangeChange(salaryMin, salaryMax)
-  }
-
   const getActiveFilterCount = () => {
     let count = 0
     if (activeFilters.category !== "all") count++
     if (activeFilters.location !== "all") count++
     if (activeFilters.type !== "all") count++
-    if (activeFilters.salaryMin || activeFilters.salaryMax) count++
+    if (activeFilters.salaryMin) count++
+    if (activeFilters.salaryMax) count++
     if (activeFilters.experience !== "all") count++
-    if (activeFilters.industry !== "all") count++
     if (activeFilters.datePosted !== "all") count++
     return count
   }
 
-  const clearSpecificFilter = (filterType: string) => {
-    switch (filterType) {
+  const clearSpecificFilter = (filter: keyof typeof activeFilters) => {
+    switch (filter) {
       case "category":
         onCategoryChange("all")
         break
@@ -72,16 +62,12 @@ export function AdvancedJobFilters({
       case "type":
         onTypeChange("all")
         break
-      case "salary":
-        setSalaryMin("")
-        setSalaryMax("")
+      case "salaryMin":
+      case "salaryMax":
         onSalaryRangeChange("", "")
         break
       case "experience":
         onExperienceChange("all")
-        break
-      case "industry":
-        onIndustryChange("all")
         break
       case "datePosted":
         onDatePostedChange("all")
@@ -137,13 +123,11 @@ export function AdvancedJobFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem value="San Francisco, CA">San Francisco</SelectItem>
+                <SelectItem value="New York, NY">New York</SelectItem>
+                <SelectItem value="London, UK">London</SelectItem>
+                <SelectItem value="Berlin, Germany">Berlin</SelectItem>
                 <SelectItem value="Remote">Remote</SelectItem>
-                <SelectItem value="New York">New York</SelectItem>
-                <SelectItem value="San Francisco">San Francisco</SelectItem>
-                <SelectItem value="London">London</SelectItem>
-                <SelectItem value="Berlin">Berlin</SelectItem>
-                <SelectItem value="Boston">Boston</SelectItem>
-                <SelectItem value="Seattle">Seattle</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -163,93 +147,64 @@ export function AdvancedJobFilters({
           </div>
         </div>
 
-        <Separator />
-
-        {/* Advanced Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Salary Range */}
-          <div className="space-y-2">
-            <Label>Salary Range (USD)</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Min"
-                value={salaryMin}
-                onChange={(e) => setSalaryMin(e.target.value)}
-                onBlur={handleSalaryChange}
-                className="text-sm"
-              />
-              <Input
-                type="number"
-                placeholder="Max"
-                value={salaryMax}
-                onChange={(e) => setSalaryMax(e.target.value)}
-                onBlur={handleSalaryChange}
-                className="text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Experience Level */}
-          <div className="space-y-2">
-            <Label htmlFor="experience">Experience Level</Label>
-            <Select value={activeFilters.experience} onValueChange={onExperienceChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Any Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any Level</SelectItem>
-                <SelectItem value="Entry-level">Entry-level (0-2 years)</SelectItem>
-                <SelectItem value="Mid-level">Mid-level (3-5 years)</SelectItem>
-                <SelectItem value="Senior">Senior (5+ years)</SelectItem>
-                <SelectItem value="Executive">Executive (10+ years)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Industry */}
-          <div className="space-y-2">
-            <Label htmlFor="industry">Industry</Label>
-            <Select value={activeFilters.industry} onValueChange={onIndustryChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Industries" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Industries</SelectItem>
-                <SelectItem value="Technology">Technology</SelectItem>
-                <SelectItem value="Healthcare">Healthcare</SelectItem>
-                <SelectItem value="Finance">Finance</SelectItem>
-                <SelectItem value="Education">Education</SelectItem>
-                <SelectItem value="Retail">Retail</SelectItem>
-                <SelectItem value="Manufacturing">Manufacturing</SelectItem>
-                <SelectItem value="Consulting">Consulting</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Date Posted */}
-          <div className="space-y-2">
-            <Label htmlFor="datePosted">Date Posted</Label>
-            <Select value={activeFilters.datePosted} onValueChange={onDatePostedChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Any time" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any time</SelectItem>
-                <SelectItem value="24h">Last 24 hours</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* Salary Range */}
+        <div className="space-y-2">
+          <Label>Salary Range</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              type="number"
+              placeholder="Min"
+              value={activeFilters.salaryMin}
+              onChange={(e) => onSalaryRangeChange(e.target.value, activeFilters.salaryMax)}
+            />
+            <Input
+              type="number"
+              placeholder="Max"
+              value={activeFilters.salaryMax}
+              onChange={(e) => onSalaryRangeChange(activeFilters.salaryMin, e.target.value)}
+            />
           </div>
         </div>
 
-        {/* Active Filters Display */}
+        {/* Experience Level */}
+        <div className="space-y-2">
+          <Label htmlFor="experience">Experience Level</Label>
+          <Select value={activeFilters.experience} onValueChange={onExperienceChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Experience Levels" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Experience Levels</SelectItem>
+              <SelectItem value="Entry-level (0-2 years)">Entry Level (0-2 years)</SelectItem>
+              <SelectItem value="Mid-level (3-5 years)">Mid Level (3-5 years)</SelectItem>
+              <SelectItem value="Senior (5+ years)">Senior (5+ years)</SelectItem>
+              <SelectItem value="Executive (10+ years)">Executive (10+ years)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Posted */}
+        <div className="space-y-2">
+          <Label htmlFor="datePosted">Date Posted</Label>
+          <Select value={activeFilters.datePosted} onValueChange={onDatePostedChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Any Time" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any Time</SelectItem>
+              <SelectItem value="24h">Last 24 Hours</SelectItem>
+              <SelectItem value="7d">Last 7 Days</SelectItem>
+              <SelectItem value="30d">Last 30 Days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Active Filters */}
         {getActiveFilterCount() > 0 && (
           <>
             <Separator />
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Active Filters:</Label>
+              <Label>Active Filters</Label>
               <div className="flex flex-wrap gap-2">
                 {activeFilters.category !== "all" && (
                   <Badge variant="secondary" className="flex items-center gap-1">
@@ -271,20 +226,20 @@ export function AdvancedJobFilters({
                 )}
                 {(activeFilters.salaryMin || activeFilters.salaryMax) && (
                   <Badge variant="secondary" className="flex items-center gap-1">
-                    Salary: ${activeFilters.salaryMin || "0"} - ${activeFilters.salaryMax || "∞"}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => clearSpecificFilter("salary")} />
+                    Salary: {activeFilters.salaryMin || "0"} - {activeFilters.salaryMax || "∞"}
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => {
+                        clearSpecificFilter("salaryMin")
+                        clearSpecificFilter("salaryMax")
+                      }}
+                    />
                   </Badge>
                 )}
                 {activeFilters.experience !== "all" && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     Experience: {activeFilters.experience}
                     <X className="h-3 w-3 cursor-pointer" onClick={() => clearSpecificFilter("experience")} />
-                  </Badge>
-                )}
-                {activeFilters.industry !== "all" && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    Industry: {activeFilters.industry}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => clearSpecificFilter("industry")} />
                   </Badge>
                 )}
                 {activeFilters.datePosted !== "all" && (
